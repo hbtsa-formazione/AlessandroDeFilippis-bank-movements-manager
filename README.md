@@ -10,7 +10,7 @@
 
 ## Obiettivo
 
-Creare un'applicazione Angular per la gestione di conti bancari e movimenti bancari. L'applicazione permetterà di visualizzare, creare, modificare ed eliminare conti bancari e i relativi movimenti.
+Creare un'applicazione Angular per la gestione di conti bancari e movimenti bancari. L'applicazione permetterà di visualizzare, creare, modificare ed eliminare conti bancari e i relativi movimenti..
 
 ---
 
