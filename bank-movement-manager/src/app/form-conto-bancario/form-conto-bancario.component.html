@@ -1,1 +1,55 @@
-<p>form-conto-bancario works!</p>
+<div class="page">
+  <h2>{{ isEdit ? 'Modifica Conto' : 'Nuovo Conto' }}</h2>
+
+  <form [formGroup]="form" (ngSubmit)="salva()">
+    <div class="field">
+      <label for="accountName">Nome *</label>
+      <input 
+        id="accountName"
+        type="text"
+        formControlName="name" 
+        placeholder="Nome del conto"
+        [class.invalid]="form.get('name')?.invalid && form.get('name')?.touched">
+      <span class="error" *ngIf="form.get('name')?.invalid && form.get('name')?.touched">
+        <span *ngIf="form.get('name')?.errors?.['required']">Il nome è obbligatorio</span>
+        <span *ngIf="form.get('name')?.errors?.['minlength']">Il nome deve essere di almeno 3 caratteri</span>
+      </span>
+    </div>
+
+    <div class="field">
+      <label for="accountIban">IBAN</label>
+      <input 
+        id="accountIban"
+        type="text"
+        formControlName="iban" 
+        placeholder="IT00X0000000000000000000000"
+        [class.invalid]="form.get('iban')?.invalid && form.get('iban')?.touched">
+      <span class="error" *ngIf="form.get('iban')?.invalid && form.get('iban')?.touched">
+        <span *ngIf="form.get('iban')?.errors?.['pattern']">Formato IBAN non valido</span>
+      </span>
+    </div>
+
+    <div class="field">
+      <label for="accountCurrency">Valuta *</label>
+      <select 
+        id="accountCurrency"
+        formControlName="currency"
+        [class.invalid]="form.get('currency')?.invalid && form.get('currency')?.touched">
+        <option value="">Seleziona una valuta</option>
+        <option value="EUR">EUR - Euro</option>
+        <option value="USD">USD - Dollaro Americano</option>
+        <option value="GBP">GBP - Sterlina Britannica</option>
+      </select>
+      <span class="error" *ngIf="form.get('currency')?.invalid && form.get('currency')?.touched">
+        La valuta è obbligatoria
+      </span>
+    </div>
+
+    <div class="actions">
+      <button class="btn primary" type="submit" [disabled]="form.invalid">
+        {{ isEdit ? 'Aggiorna' : 'Crea' }}
+      </button>
+      <button class="btn" type="button" (click)="annulla()">Annulla</button>
+    </div>
+  </form>
+</div>

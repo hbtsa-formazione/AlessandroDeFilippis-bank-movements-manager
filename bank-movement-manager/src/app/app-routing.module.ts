@@ -1,4 +1,3 @@
-
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { HomeComponent } from './home/home.component';
@@ -12,13 +11,17 @@ const routes: Routes = [
   { path: 'home', component: HomeComponent },
   { path: 'lista-conti-bancari', component: ListaContiBancariComponent },
   { path: 'lista-movimenti', component: ListaMovimentiComponent },
+  
+  // Form conto: creazione e modifica
   { path: 'form-conto-bancario', component: FormContoBancarioComponent },
+  { path: 'form-conto-bancario/:id', component: FormContoBancarioComponent },
+  
   { path: 'form-movimento', component: FormMovimentoComponent },
   { path: '**', redirectTo: '/home' }
 ];
 
 @NgModule({
-  imports: [RouterModule.forRoot(routes)],
+  imports: [RouterModule.forRoot(routes, { scrollPositionRestoration: 'enabled' })],
   exports: [RouterModule]
 })
-export class AppRoutingModule {}
+export class AppRoutingModule { }

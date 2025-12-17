@@ -1,1 +1,39 @@
-<p>lista-conti-bancari works!</p>
+<div class="page">
+  <header class="header">
+    <h2>Lista Conti Bancari</h2>
+    <div class="actions">
+      <button class="btn primary" (click)="nuovoConto()">➕ Nuovo Conto</button>
+      <button class="btn" (click)="tornaHome()">🏠 Home</button>
+    </div>
+  </header>
+
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>IBAN</th>
+          <th>Valuta</th>
+          <th class="col-azioni">Azioni</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let c of conti$ | async; trackBy: trackById">
+          <td>{{ c.name }}</td>
+          <td class="iban">{{ c.iban }}</td>
+          <td>{{ c.currency }}</td>
+          <td class="azioni">
+            <button class="btn small" (click)="modificaConto(c)">✏️ Modifica</button>
+            <button class="btn small danger" (click)="eliminaConto(c)">🗑️ Elimina</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Stato vuoto -->
+  <div class="empty" *ngIf="(conti$ | async)?.length === 0">
+    <p>Nessun conto presente.</p>
+    <button class="btn primary" (click)="nuovoConto()">➕ Crea il primo conto</button>
+  </div>
+</div>

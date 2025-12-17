@@ -1,0 +1,99 @@
+.page { 
+  padding: 16px; 
+}
+
+.header {
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.actions { 
+  display: flex; 
+  gap: 8px; 
+}
+
+.table-wrap { 
+  overflow-x: auto; 
+}
+
+.table {
+  width: 100%; 
+  border-collapse: collapse; 
+  background: #fff;
+  border: 1px solid #e5e7eb; 
+  border-radius: 8px; 
+  overflow: hidden;
+}
+
+.table th, .table td {
+  padding: 10px 12px; 
+  border-bottom: 1px solid #f3f4f6; 
+  text-align: left;
+}
+
+.table thead th { 
+  background: #f9fafb; 
+  font-weight: 600; 
+}
+
+.table .col-azioni { 
+  width: 220px; 
+}
+
+.azioni { 
+  display: flex; 
+  gap: 8px; 
+}
+
+.iban {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  letter-spacing: 0.3px;
+}
+
+.btn {
+  padding: 8px 12px; 
+  border: 1px solid #d1d5db; 
+  border-radius: 6px;
+  background: #f9fafb; 
+  cursor: pointer; 
+  transition: background 0.15s;
+}
+
+.btn:hover { 
+  background: #f3f4f6; 
+}
+
+.btn.small { 
+  padding: 6px 10px; 
+  font-size: 0.9rem; 
+}
+
+.btn.primary { 
+  background: #2563eb; 
+  color: white; 
+  border-color: #1e40af; 
+}
+
+.btn.primary:hover { 
+  background: #1d4ed8; 
+}
+
+.btn.danger { 
+  background: #ef4444; 
+  color: white; 
+  border-color: #b91c1c; 
+}
+
+.btn.danger:hover { 
+  background: #dc2626; 
+}
+
+.empty {
+  margin-top: 16px; 
+  padding: 16px; 
+  border: 1px dashed #d1d5db; 
+  border-radius: 8px; 
+  text-align: center;
+}
