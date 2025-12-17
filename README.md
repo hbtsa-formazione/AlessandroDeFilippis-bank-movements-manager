@@ -33,7 +33,7 @@ Il collegamento al server deve essere **mockato** utilizzando un database in mem
 
 ### Stile
 
-Libera scelta per quanto riguarda CSS e librerie UI. Puoi usare CSS puro, Bootstrap, Angular Material o qualsiasi altra soluzione tu preferisca.
+Libera scelta per quanto riguarda CSS e librerie UI. Puoi usare CSS puro, Bootstrap, Angular Material o qualsiasi altra soluzione tu preferisca..
 
 ---
 
