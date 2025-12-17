@@ -1,0 +1,8 @@
+{
+  "devDependencies": {
+    "@types/node": "^18.11.9"
+  },
+  "dependencies": {
+    "angular-in-memory-web-api": "^0.14.0"
+  }
+}
