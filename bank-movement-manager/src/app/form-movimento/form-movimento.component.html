@@ -1,1 +1,39 @@
-<p>form-movimento works!</p>
+<div class="container">
+  <h2>{{ isEditMode ? 'Modifica Movimento' : 'Crea Nuovo Movimento' }}</h2>
+
+  <form [formGroup]="form" (ngSubmit)="onSave()">
+    <div class="mb-3">
+      <label for="accountId" class="form-label">Conto Bancario</label>
+      <select id="accountId" class="form-control" formControlName="accountId" *ngIf="accounts$ | async as accounts">
+        <option value="">Seleziona un conto</option>
+        <option *ngFor="let account of accounts" [value]="account.id">{{ account.name }} ({{ account.iban }})</option>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label for="date" class="form-label">Data</label>
+      <input type="date" id="date" class="form-control" formControlName="date">
+    </div>
+
+    <div class="mb-3">
+      <label for="description" class="form-label">Descrizione</label>
+      <input type="text" id="description" class="form-control" formControlName="description">
+    </div>
+
+    <div class="mb-3">
+      <label for="currency" class="form-label">Valuta</label>
+      <select id="currency" class="form-control" formControlName="currency">
+        <option value="">Seleziona valuta</option>
+        <option *ngFor="let curr of currencies" [value]="curr">{{ curr }}</option>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label for="amount" class="form-label">Importo</label>
+      <input type="number" step="0.01" id="amount" class="form-control" formControlName="amount">
+    </div>
+
+    <button type="submit" class="btn btn-primary" [disabled]="!form.valid">Salva</button>
+    <button type="button" class="btn btn-secondary ms-2" (click)="onCancel()">Annulla</button>
+  </form>
+</div>
