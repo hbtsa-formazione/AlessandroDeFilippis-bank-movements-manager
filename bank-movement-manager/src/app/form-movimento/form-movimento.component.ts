@@ -7,15 +7,27 @@ import { BankAccount } from '../model/bank-account';
 import { MovimentiService } from '../service/movimenti-service';
 import { ContiService } from '../service/conti-service';
 
+/**
+ * Componente Form per inserimento/modifica di un Movimento Bancario.
+ */
 @Component({
   selector: 'app-form-movimento',
   templateUrl: './form-movimento.component.html',
   styleUrls: ['./form-movimento.component.css']
 })
 export class FormMovimentoComponent implements OnInit {
+  
   form: FormGroup;
   isEditMode = false;
+  
+  /**
+   * Elenco dei conti disponibili per il select box.
+   */
   accounts$: Observable<BankAccount[]>;
+  
+  /**
+   * Valute supportate.
+   */
   currencies = ['EUR', 'USD', 'GBP'];
 
   constructor(
@@ -25,12 +37,13 @@ export class FormMovimentoComponent implements OnInit {
     private movimentiService: MovimentiService,
     private contiService: ContiService
   ) {
+    // Inizializzazione del form con validatori
     this.form = this.fb.group({
       accountId: ['', Validators.required],
-      date: ['', Validators.required],
+      date: [new Date().toISOString().substring(0, 10), Validators.required], // Default oggi
       description: ['', Validators.required],
-      currency: ['', Validators.required],
-      amount: ['', [Validators.required, Validators.pattern(/^-?\d+(\.\d{1,2})?$/)]]
+      currency: ['EUR', Validators.required],
+      amount: ['', [Validators.required]] // Rimosso pattern regex stringente per semplicità
     });
 
     this.accounts$ = this.contiService.getConti$();
@@ -41,6 +54,7 @@ export class FormMovimentoComponent implements OnInit {
     if (id) {
       this.isEditMode = true;
       const movement = this.movimentiService.getById(+id);
+      
       if (movement) {
         this.form.patchValue({
           accountId: movement.accountId,
@@ -49,6 +63,9 @@ export class FormMovimentoComponent implements OnInit {
           currency: movement.currency,
           amount: movement.amount
         });
+      } else {
+        // ID non trovato
+        this.router.navigate(['/lista-movimenti']);
       }
     }
   }
@@ -56,7 +73,9 @@ export class FormMovimentoComponent implements OnInit {
   onSave(): void {
     if (this.form.valid) {
       const formValue = this.form.value;
+      
       const movement: BankMovement = {
+        // Se siamo in edit, manteniamo l'ID, altrimenti 0 (new)
         id: this.isEditMode ? +this.route.snapshot.paramMap.get('id')! : 0,
         accountId: +formValue.accountId,
         date: formValue.date,
@@ -64,6 +83,7 @@ export class FormMovimentoComponent implements OnInit {
         currency: formValue.currency,
         amount: +formValue.amount
       };
+
       this.movimentiService.upsert(movement);
       this.router.navigate(['/lista-movimenti']);
     }

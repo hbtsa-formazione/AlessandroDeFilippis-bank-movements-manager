@@ -1,144 +1,273 @@
-/* Stili globali per un look da banca professionale */
+/* ==========================================================================
+   MODERN BANKING DESIGN SYSTEM
+   ========================================================================== 
+   Questo file definisce le variabili globali CSS e gli stili di base per 
+   l'intera applicazione. L'obiettivo è creare un'interfaccia pulita, 
+   professionale e moderna, tipica delle applicazioni fintech.
+   ========================================================================== */
 
-body {
-  font-family: 'Arial', sans-serif;
-  background-color: #f8f9fa;
-  color: #333;
-  margin: 0;
-  padding: 0;
+:root {
+  /* --- PALETTE COLORI --- */
+  /* Colore primario: Blu Navy scuro, trasmette fiducia e stabilità */
+  --primary-color: #003366; 
+  /* Colore secondario: Blu più chiaro per azioni e focus */
+  --secondary-color: #0056b3; 
+  /* Colore accento: Oro/Arancio per call-to-action importanti */
+  --accent-color: #f0ad4e; 
+  
+  /* Sfondi */
+  --bg-body: #f4f7f6; /* Grigio chiarissimo, riposante per gli occhi */
+  --bg-card: #ffffff; /* Bianco puro per i contenitori */
+  --bg-sidebar: #002244; /* Variante più scura del primario per la navigazione */
+
+  /* Testi */
+  --text-main: #333333; /* Quasi nero per leggibilità */
+  --text-muted: #6c757d; /* Grigio per testi secondari */
+  --text-light: #ffffff; /* Testo su sfondi scuri */
+
+  /* Feedback */
+  --success: #28a745; /* Verde per azioni positive (es. accrediti) */
+  --danger: #dc3545;  /* Rosso per azioni distruttive o addebiti */
+  --warning: #ffc107; /* Giallo per avvisi */
+  --info: #17a2b8;    /* Ciano per informazioni neutre */
+
+  /* Spaziature e Dimensioni */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+  --font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
+/* --- RESET & BASE --- */
+* {
+  box-sizing: border-box; /* Gestione corretta del box-model */
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--bg-body);
+  color: var(--text-main);
+  margin: 0;
+  padding: 0;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased; /* Migliora rendering font su Mac */
+}
+
+/* --- TYPOGRAPHY --- */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--primary-color);
+  margin-top: 0;
+  font-weight: 600;
+}
+
+h1 { font-size: 2.5rem; margin-bottom: 1.5rem; }
+h2 { font-size: 2rem; margin-bottom: 1rem; border-bottom: 2px solid #e9ecef; padding-bottom: 10px; }
+h3 { font-size: 1.5rem; margin-bottom: 1rem; }
+
+a {
+  color: var(--secondary-color);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+a:hover {
+  color: var(--primary-color);
+  text-decoration: underline;
+}
+
+/* --- LAYOUT UTILITIES --- */
 .container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  margin-top: 20px;
 }
 
-h1, h2, h3 {
-  color: #003366; /* Blu navy da banca */
-  font-weight: bold;
+.card {
+  background-color: var(--bg-card);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 24px;
+  margin-bottom: 24px;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.table {
-  border-collapse: collapse;
-  width: 100%;
-  margin-bottom: 20px;
+.card:hover {
+  box-shadow: var(--shadow-md); /* Effetto "lift" al passaggio del mouse */
 }
 
-.table th, .table td {
-  border: 1px solid #ddd;
-  padding: 12px;
-  text-align: left;
+.flex-row {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  align-items: center;
 }
 
-.table th {
-  background-color: #f2f2f2;
-  color: #003366;
-  font-weight: bold;
+.flex-between {
+  justify-content: space-between;
 }
 
-.table tbody tr:hover {
-  background-color: #f1f1f1;
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
 }
 
+/* --- BUTTONS --- */
 .btn {
-  border: none;
-  border-radius: 4px;
+  display: inline-block;
   padding: 10px 20px;
-  font-size: 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.3s;
+  transition: background-color 0.2s, transform 0.1s;
+  text-align: center;
+  text-decoration: none;
+}
+
+.btn:active {
+  transform: translateY(1px); /* Feedback tattile al click */
 }
 
 .btn-primary {
-  background-color: #007bff;
-  color: white;
+  background-color: var(--primary-color);
+  color: var(--text-light);
 }
-
 .btn-primary:hover {
-  background-color: #0056b3;
+  background-color: #002244;
+  text-decoration: none;
 }
 
 .btn-secondary {
   background-color: #6c757d;
-  color: white;
+  color: var(--text-light);
 }
-
 .btn-secondary:hover {
-  background-color: #545b62;
-}
-
-.btn-warning {
-  background-color: #ffc107;
-  color: #212529;
-}
-
-.btn-warning:hover {
-  background-color: #e0a800;
+  background-color: #5a6268;
+  text-decoration: none;
 }
 
 .btn-danger {
-  background-color: #dc3545;
-  color: white;
+  background-color: var(--danger);
+  color: var(--text-light);
 }
-
 .btn-danger:hover {
   background-color: #c82333;
+  text-decoration: none;
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 0.875rem;
+}
+
+/* --- FORMS --- */
+.form-group {
+  margin-bottom: 16px;
+}
+
+label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--text-main);
 }
 
 .form-control {
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 10px;
-  font-size: 14px;
   width: 100%;
-  box-sizing: border-box;
+  padding: 10px 12px;
+  font-size: 1rem;
+  border: 1px solid #ced4da;
+  border-radius: var(--radius-sm);
+  transition: border-color 0.2s;
 }
 
 .form-control:focus {
-  border-color: #007bff;
   outline: none;
-  box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+  border-color: var(--secondary-color);
+  box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.25);
 }
 
-.list-group-item {
-  border: 1px solid #ddd;
-  padding: 10px;
-  background-color: #fff;
+/* --- TABLES --- */
+.table-container {
+  overflow-x: auto; /* Scroll orizzontale su mobile */
 }
 
-.list-group-item:nth-child(odd) {
-  background-color: #f8f9fa;
-}
-
-/* Navigazione */
-nav {
-  background-color: #003366;
-  color: white;
-  padding: 10px 0;
-}
-
-nav a {
-  color: white;
-  text-decoration: none;
-  margin: 0 15px;
-}
-
-nav a:hover {
-  text-decoration: underline;
-}
-
-/* Footer se necessario */
-footer {
-  text-align: center;
-  padding: 10px;
-  background-color: #003366;
-  color: white;
-  position: fixed;
-  bottom: 0;
+.table {
   width: 100%;
+  border-collapse: separate; /* Permette border-radius */
+  border-spacing: 0;
+  margin-bottom: 1rem;
+}
+
+.table th, .table td {
+  padding: 16px;
+  vertical-align: top;
+  border-bottom: 1px solid #dee2e6;
+  text-align: left;
+}
+
+.table th {
+  background-color: #f8f9fa;
+  color: var(--primary-color);
+  font-weight: 600;
+  border-top: 1px solid #dee2e6;
+}
+
+.table tbody tr:hover {
+  background-color: rgba(0, 51, 102, 0.05); /* Leggero tint blu al passaggio */
+}
+
+/* Formattazione specifica per importi */
+.amount {
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: bold;
+  text-align: right;
+}
+.amount.positive { color: var(--success); }
+.amount.negative { color: var(--danger); }
+
+/* --- ALERTS & BADGES --- */
+.alert {
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+}
+.alert-info {
+  background-color: #d1ecf1;
+  border-color: #bee5eb;
+  color: #0c5460;
+}
+
+/* --- NAVIGATION (Navbar semplice) --- */
+.navbar {
+  background-color: var(--primary-color);
+  color: var(--text-light);
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: var(--shadow-md);
+}
+
+.navbar-brand {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--text-light);
+  text-decoration: none;
+}
+
+.nav-links a {
+  color: rgba(255,255,255,0.8);
+  margin-left: 20px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.nav-links a:hover, .nav-links a.active {
+  color: #ffffff;
+  border-bottom: 2px solid var(--accent-color);
 }

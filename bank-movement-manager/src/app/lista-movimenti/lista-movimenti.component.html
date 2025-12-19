@@ -1,48 +1,76 @@
 <div class="container">
-  <h2>Lista Movimenti</h2>
+  <div class="flex-row flex-between" style="margin-bottom: 24px;">
+    <h2>Lista Movimenti</h2>
+    <div class="flex-row">
+      <button class="btn btn-secondary" (click)="onBackToHome()">🏠 Home</button>
+      <button class="btn btn-primary" (click)="onCreateNew()">➕ Nuovo Movimento</button>
+    </div>
+  </div>
 
-  <button class="btn btn-primary mb-3" (click)="onCreateNew()">Crea Nuovo Movimento</button>
-  <button class="btn btn-secondary mb-3 ms-2" (click)="onBackToHome()">Torna alla Home</button>
+  <div class="card table-container">
+    <table class="table" *ngIf="movementsWithAccounts$ | async as movements">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Conto</th>
+          <th>Descrizione</th>
+          <th>Valuta</th>
+          <th style="text-align: right;">Importo</th>
+          <th style="width: 150px;">Azioni</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let mov of movements">
+          <td>{{ mov.date | date:'dd/MM/yyyy' }}</td>
+          <td>
+            <div><strong>{{ mov.accountName }}</strong></div>
+            <div style="font-size: 0.85rem; color: #666;">{{ mov.accountIban }}</div>
+          </td>
+          <td>{{ mov.description }}</td>
+          <td>{{ mov.currency }}</td>
+          <td class="amount" [class.positive]="mov.amount >= 0" [class.negative]="mov.amount < 0">
+            {{ mov.amount | number:'1.2-2' }}
+          </td>
+          <td>
+            <div class="flex-row" style="gap: 8px;">
+              <button class="btn btn-sm btn-warning" (click)="onEdit(mov)">✏️</button>
+              <button class="btn btn-sm btn-danger" (click)="onDelete(mov)">🗑️</button>
+            </div>
+          </td>
+        </tr>
+        <tr *ngIf="(movementsWithAccounts$ | async)?.length === 0">
+          <td colspan="6" style="text-align: center; padding: 20px;">
+            <p class="text-muted">Nessun movimento registrato.</p>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 
-  <table class="table table-striped" *ngIf="movementsWithAccounts$ | async as movements">
-    <thead>
-      <tr>
-        <th>Nome Conto Bancario</th>
-        <th>IBAN Conto Bancario</th>
-        <th>Data Movimento</th>
-        <th>Descrizione Movimento</th>
-        <th>Valuta</th>
-        <th>Importo</th>
-        <th>Azioni</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let mov of movements">
-        <td>{{ mov.accountName }}</td>
-        <td>{{ mov.accountIban }}</td>
-        <td>{{ mov.date }}</td>
-        <td>{{ mov.description }}</td>
-        <td>{{ mov.currency }}</td>
-        <td>{{ mov.amount | number:'1.2-2' }}</td>
-        <td>
-          <button class="btn btn-warning btn-sm me-2" (click)="onEdit(mov)">Modifica</button>
-          <button class="btn btn-danger btn-sm" (click)="onDelete(mov)">Elimina</button>
-        </td>
-      </tr>
-    </tbody>
-  </table>
+  <!-- Sezione Statistiche Rapide -->
+  <div class="grid-2">
+    <div class="card">
+      <h3>Totali per Valuta</h3>
+      <table class="table">
+        <tr *ngFor="let total of totalsByCurrency | keyvalue">
+          <td><strong>{{ total.key }}</strong></td>
+          <td class="amount" [class.positive]="total.value >= 0" [class.negative]="total.value < 0">
+            {{ total.value | number:'1.2-2' }}
+          </td>
+        </tr>
+      </table>
+    </div>
 
-  <h3>Totali per Valuta</h3>
-  <ul class="list-group mb-3">
-    <li class="list-group-item" *ngFor="let total of totalsByCurrency | keyvalue">
-      {{ total.key }}: {{ total.value | number:'1.2-2' }}
-    </li>
-  </ul>
-
-  <h3>Totali per Conto Bancario</h3>
-  <ul class="list-group">
-    <li class="list-group-item" *ngFor="let total of totalsByAccount | keyvalue">
-      {{ total.value.name }}: {{ total.value.total | number:'1.2-2' }}
-    </li>
-  </ul>
+    <div class="card">
+      <h3>Totali per Conto</h3>
+      <table class="table">
+        <tr *ngFor="let total of totalsByAccount | keyvalue">
+          <td>{{ total.value.name }}</td>
+          <td class="amount" [class.positive]="total.value.total >= 0" [class.negative]="total.value.total < 0">
+            {{ total.value.total | number:'1.2-2' }}
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
 </div>

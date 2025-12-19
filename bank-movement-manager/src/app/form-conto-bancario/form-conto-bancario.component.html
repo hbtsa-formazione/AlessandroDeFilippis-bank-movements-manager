@@ -1,55 +1,67 @@
-<div class="page">
-  <h2>{{ isEdit ? 'Modifica Conto' : 'Nuovo Conto' }}</h2>
+<div class="container">
+  <div class="card" style="max-width: 600px; margin: 0 auto;">
+    <h2>{{ isEdit ? 'Modifica Conto' : 'Nuovo Conto' }}</h2>
+    <p style="color: #666; margin-bottom: 20px;">
+      Compila i dettagli del conto bancario qui sotto.
+    </p>
 
-  <form [formGroup]="form" (ngSubmit)="salva()">
-    <div class="field">
-      <label for="accountName">Nome *</label>
-      <input 
-        id="accountName"
-        type="text"
-        formControlName="name" 
-        placeholder="Nome del conto"
-        [class.invalid]="form.get('name')?.invalid && form.get('name')?.touched">
-      <span class="error" *ngIf="form.get('name')?.invalid && form.get('name')?.touched">
-        <span *ngIf="form.get('name')?.errors?.['required']">Il nome è obbligatorio</span>
-        <span *ngIf="form.get('name')?.errors?.['minlength']">Il nome deve essere di almeno 3 caratteri</span>
-      </span>
-    </div>
+    <form [formGroup]="form" (ngSubmit)="salva()">
+      <!-- Nome Conto -->
+      <div class="form-group">
+        <label for="accountName">Nome Conto *</label>
+        <input 
+          id="accountName"
+          type="text"
+          class="form-control"
+          formControlName="name" 
+          placeholder="Es. Conto Principale"
+          [class.invalid]="form.get('name')?.invalid && form.get('name')?.touched">
+        
+        <!-- Messaggi di errore -->
+        <div class="alert alert-danger" *ngIf="form.get('name')?.invalid && form.get('name')?.touched" style="margin-top: 5px; padding: 5px 10px; font-size: 0.8rem;">
+          <span *ngIf="form.get('name')?.errors?.['required']">Il nome è obbligatorio.</span>
+          <span *ngIf="form.get('name')?.errors?.['maxlength']">Massimo 80 caratteri.</span>
+        </div>
+      </div>
 
-    <div class="field">
-      <label for="accountIban">IBAN</label>
-      <input 
-        id="accountIban"
-        type="text"
-        formControlName="iban" 
-        placeholder="IT00X0000000000000000000000"
-        [class.invalid]="form.get('iban')?.invalid && form.get('iban')?.touched">
-      <span class="error" *ngIf="form.get('iban')?.invalid && form.get('iban')?.touched">
-        <span *ngIf="form.get('iban')?.errors?.['pattern']">Formato IBAN non valido</span>
-      </span>
-    </div>
+      <!-- IBAN -->
+      <div class="form-group">
+        <label for="accountIban">IBAN *</label>
+        <input 
+          id="accountIban"
+          type="text"
+          class="form-control"
+          formControlName="iban" 
+          placeholder="IT00X..."
+          style="font-family: monospace;"
+          [class.invalid]="form.get('iban')?.invalid && form.get('iban')?.touched">
+        
+        <div class="alert alert-danger" *ngIf="form.get('iban')?.invalid && form.get('iban')?.touched" style="margin-top: 5px; padding: 5px 10px; font-size: 0.8rem;">
+          <span *ngIf="form.get('iban')?.errors?.['required']">L'IBAN è obbligatorio.</span>
+          <span *ngIf="form.get('iban')?.errors?.['maxlength']">Lunghezza non valida.</span>
+        </div>
+      </div>
 
-    <div class="field">
-      <label for="accountCurrency">Valuta *</label>
-      <select 
-        id="accountCurrency"
-        formControlName="currency"
-        [class.invalid]="form.get('currency')?.invalid && form.get('currency')?.touched">
-        <option value="">Seleziona una valuta</option>
-        <option value="EUR">EUR - Euro</option>
-        <option value="USD">USD - Dollaro Americano</option>
-        <option value="GBP">GBP - Sterlina Britannica</option>
-      </select>
-      <span class="error" *ngIf="form.get('currency')?.invalid && form.get('currency')?.touched">
-        La valuta è obbligatoria
-      </span>
-    </div>
+      <!-- Valuta -->
+      <div class="form-group">
+        <label for="accountCurrency">Valuta *</label>
+        <select 
+          id="accountCurrency"
+          class="form-control"
+          formControlName="currency">
+          <option value="EUR">EUR - Euro</option>
+          <option value="USD">USD - Dollaro Americano</option>
+          <option value="GBP">GBP - Sterlina Britannica</option>
+        </select>
+      </div>
 
-    <div class="actions">
-      <button class="btn primary" type="submit" [disabled]="form.invalid">
-        {{ isEdit ? 'Aggiorna' : 'Crea' }}
-      </button>
-      <button class="btn" type="button" (click)="annulla()">Annulla</button>
-    </div>
-  </form>
+      <!-- Azioni -->
+      <div class="flex-row flex-between" style="margin-top: 30px;">
+        <button class="btn btn-secondary" type="button" (click)="annulla()">Annulla</button>
+        <button class="btn btn-primary" type="submit" [disabled]="form.invalid">
+          {{ isEdit ? 'Salva Modifiche' : 'Crea Conto' }}
+        </button>
+      </div>
+    </form>
+  </div>
 </div>

@@ -1,39 +1,41 @@
-<div class="page">
-  <header class="header">
+<div class="container">
+  <div class="flex-row flex-between" style="margin-bottom: 24px;">
     <h2>Lista Conti Bancari</h2>
-    <div class="actions">
-      <button class="btn primary" (click)="nuovoConto()">➕ Nuovo Conto</button>
-      <button class="btn" (click)="tornaHome()">🏠 Home</button>
+    <div class="flex-row">
+      <button class="btn btn-secondary" (click)="tornaHome()">🏠 Home</button>
+      <button class="btn btn-primary" (click)="nuovoConto()">➕ Nuovo Conto</button>
     </div>
-  </header>
+  </div>
 
-  <div class="table-wrap">
+  <div class="card table-container">
     <table class="table">
       <thead>
         <tr>
           <th>Nome</th>
           <th>IBAN</th>
           <th>Valuta</th>
-          <th class="col-azioni">Azioni</th>
+          <th style="width: 200px;">Azioni</th>
         </tr>
       </thead>
       <tbody>
         <tr *ngFor="let c of conti$ | async; trackBy: trackById">
-          <td>{{ c.name }}</td>
-          <td class="iban">{{ c.iban }}</td>
+          <td><strong>{{ c.name }}</strong></td>
+          <td style="font-family: monospace;">{{ c.iban }}</td>
           <td>{{ c.currency }}</td>
-          <td class="azioni">
-            <button class="btn small" (click)="modificaConto(c)">✏️ Modifica</button>
-            <button class="btn small danger" (click)="eliminaConto(c)">🗑️ Elimina</button>
+          <td>
+            <div class="flex-row" style="gap: 8px;">
+              <button class="btn btn-sm btn-secondary" (click)="modificaConto(c)">✏️</button>
+              <button class="btn btn-sm btn-danger" (click)="eliminaConto(c)">🗑️</button>
+            </div>
+          </td>
+        </tr>
+        <tr *ngIf="(conti$ | async)?.length === 0">
+          <td colspan="4" style="text-align: center; padding: 20px;">
+            <p class="text-muted">Nessun conto presente.</p>
+            <button class="btn btn-primary" (click)="nuovoConto()">Crea il primo conto</button>
           </td>
         </tr>
       </tbody>
     </table>
-  </div>
-
-  <!-- Stato vuoto -->
-  <div class="empty" *ngIf="(conti$ | async)?.length === 0">
-    <p>Nessun conto presente.</p>
-    <button class="btn primary" (click)="nuovoConto()">➕ Crea il primo conto</button>
   </div>
 </div>

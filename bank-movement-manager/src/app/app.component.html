@@ -1,2 +1,18 @@
-<router-outlet></router-outlet>
-<!-- risolve il componente da utilizzare tramite la rotta URL se sei in /movements oppure in /statistics e carica il componente relativo. -->
+<!-- 
+  Layout principale dell'applicazione.
+  Contiene la barra di navigazione fissa in alto e il router-outlet
+  dove vengono caricati dinamicamente i componenti delle pagine.
+-->
+<nav class="navbar">
+  <a routerLink="/home" class="navbar-brand">Bank Manager</a>
+  <div class="nav-links">
+    <a routerLink="/home" routerLinkActive="active">Dashboard</a>
+    <a routerLink="/lista-conti-bancari" routerLinkActive="active">Conti</a>
+    <a routerLink="/lista-movimenti" routerLinkActive="active">Movimenti</a>
+  </div>
+</nav>
+
+<div class="container">
+  <!-- Qui Angular inietta il componente corrispondente alla rotta attiva -->
+  <router-outlet></router-outlet>
+</div>
