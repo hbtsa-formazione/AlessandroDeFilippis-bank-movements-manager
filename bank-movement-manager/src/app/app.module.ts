@@ -1,6 +1,6 @@
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
-import { ReactiveFormsModule } from '@angular/forms';
+import { ReactiveFormsModule } from '@angular/forms'; // Importa ReactiveFormsModule per i moduli reattivi (per ora usare template form, vedi angular 102)
 import { AppRoutingModule } from './app-routing.module';
 
 import { AppComponent } from './app.component';
