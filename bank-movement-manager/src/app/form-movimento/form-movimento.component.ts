@@ -8,7 +8,11 @@ import { MovimentiService } from '../service/movimenti-service';
 import { ContiService } from '../service/conti-service';
 
 /**
- * Componente Form per inserimento/modifica di un Movimento Bancario.
+ * =========================================================================================
+ * COMPONENT: FORM MOVIMENTO
+ * =========================================================================================
+ * Gestisce l'inserimento e la modifica dei movimenti.
+ * Include un esempio di popolamento di una <select> dinamica tramite Observable.
  */
 @Component({
   selector: 'app-form-movimento',
@@ -21,13 +25,14 @@ export class FormMovimentoComponent implements OnInit {
   isEditMode = false;
   
   /**
-   * Elenco dei conti disponibili per il select box.
+   * Observable per popolare la Select Box dei conti nel template.
+   * Non sottoscriviamo qui nel TS (`.subscribe()`), ma passiamo l'observable
+   * direttamente al template HTML che userà la pipe `| async`.
+   * Questo è un pattern best-practice in Angular.
    */
   accounts$: Observable<BankAccount[]>;
   
-  /**
-   * Valute supportate.
-   */
+  /** Array statico per le opzioni della valuta */
   currencies = ['EUR', 'USD', 'GBP'];
 
   constructor(
@@ -37,25 +42,31 @@ export class FormMovimentoComponent implements OnInit {
     private movimentiService: MovimentiService,
     private contiService: ContiService
   ) {
-    // Inizializzazione del form con validatori
+    // Inizializzazione del form
     this.form = this.fb.group({
-      accountId: ['', Validators.required],
-      date: [new Date().toISOString().substring(0, 10), Validators.required], // Default oggi
+      accountId: ['', Validators.required], // Campo obbligatorio
+      // Impostiamo la data di oggi come default (formato YYYY-MM-DD per input type="date")
+      date: [new Date().toISOString().substring(0, 10), Validators.required], 
       description: ['', Validators.required],
       currency: ['EUR', Validators.required],
-      amount: ['', [Validators.required]] // Rimosso pattern regex stringente per semplicità
+      amount: ['', [Validators.required]] 
     });
 
+    // Colleghiamo l'observable dei conti dal service
     this.accounts$ = this.contiService.getConti$();
   }
 
   ngOnInit(): void {
+    // Verifica se siamo in edit mode
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.isEditMode = true;
+      
+      // Recupero sincrono del movimento (poiché il service mantiene lo stato in memoria)
       const movement = this.movimentiService.getById(+id);
       
       if (movement) {
+        // Popolamento form
         this.form.patchValue({
           accountId: movement.accountId,
           date: movement.date,
@@ -64,7 +75,7 @@ export class FormMovimentoComponent implements OnInit {
           amount: movement.amount
         });
       } else {
-        // ID non trovato
+        // ID non trovato -> redirect
         this.router.navigate(['/lista-movimenti']);
       }
     }
@@ -74,17 +85,26 @@ export class FormMovimentoComponent implements OnInit {
     if (this.form.valid) {
       const formValue = this.form.value;
       
+      // Costruzione dell'oggetto Model dai dati del Form
       const movement: BankMovement = {
-        // Se siamo in edit, manteniamo l'ID, altrimenti 0 (new)
+        // ID: se edit prendiamo da URL, se nuovo mettiamo 0
         id: this.isEditMode ? +this.route.snapshot.paramMap.get('id')! : 0,
+        
+        // Conversione tipi: i valori dei form HTML sono sempre stringhe,
+        // dobbiamo convertirli in numeri con il prefisso '+' (unary plus)
         accountId: +formValue.accountId,
+        amount: +formValue.amount,
+        
+        // Stringhe semplici
         date: formValue.date,
         description: formValue.description,
         currency: formValue.currency,
-        amount: +formValue.amount
       };
 
+      // Chiamata al service
       this.movimentiService.upsert(movement);
+      
+      // Navigazione
       this.router.navigate(['/lista-movimenti']);
     }
   }

@@ -4,21 +4,23 @@ import { map } from 'rxjs/operators';
 import { BankMovement } from '../model/bank-movement';
 
 /**
- * Service responsabile della gestione dei Movimenti Bancari.
- * 
- * Segue lo stesso pattern architetturale del ContiService per coerenza:
- * - Reactive State Management con BehaviorSubject
- * - Operazioni CRUD immutabili
- * - Logica di business centralizzata
+ * =========================================================================================
+ * SERVICE: MOVIMENTI SERVICE
+ * =========================================================================================
+ * Gestisce la logica CRUD (Create, Read, Update, Delete) per i movimenti bancari.
+ * Segue gli stessi pattern del `ContiService` per coerenza architetturale.
  */
 @Injectable({ providedIn: 'root' })
 export class MovimentiService {
   
-  // Inizializzazione con dati mock (finti) per simulare un database
+  /**
+   * Database simulato in memoria (In-Memory Store).
+   * Contiene la lista di tutti i movimenti di tutti i conti.
+   */
   private readonly _movimenti$ = new BehaviorSubject<BankMovement[]>([
     {
       id: 1,
-      accountId: 1,
+      accountId: 1, // Collegato al Conto ID 1
       date: '2025-12-15',
       description: 'Stipendio Dicembre',
       currency: 'EUR',
@@ -30,11 +32,11 @@ export class MovimentiService {
     },
     {
       id: 2,
-      accountId: 1,
+      accountId: 1, // Collegato al Conto ID 1
       date: '2025-12-16',
       description: 'Pagamento bolletta luce',
       currency: 'EUR',
-      amount: -120.50,
+      amount: -120.50, // Importo negativo = Uscita
       direction: 'debit',
       category: 'Bolletta',
       balanceAfter: 7379.50,
@@ -43,35 +45,39 @@ export class MovimentiService {
   ]);
 
   /**
-   * Restituisce tutti i movimenti come Observable.
+   * Restituisce il flusso completo di tutti i movimenti.
    */
   getMovimenti$(): Observable<BankMovement[]> {
     return this._movimenti$.asObservable();
   }
 
   /**
-   * Restituisce i movimenti filtrati per uno specifico conto.
-   * Utilizza l'operatore RxJS `map` per trasformare lo stream dei dati.
+   * OPERATORE PIPE E MAP
+   * ---------------------------------------------------------------------------------------
+   * Questo metodo restituisce un Observable che emette SOLO i movimenti di un certo conto.
    * 
-   * @param accountId L'ID del conto di cui si vogliono i movimenti.
+   * `.pipe()`: È un metodo degli Observable che permette di concatenare operazioni di trasformazione.
+   * `map(...)`: È un operatore RxJS che prende i dati emessi (l'array completo) e li trasforma.
+   * 
+   * In questo caso: Array Completo -> Filtro per accountId -> Array Filtrato.
+   * Il componente che si iscrive a questo metodo riceverà aggiornamenti solo quando
+   * la lista filtrata cambia.
    */
   getMovimentiByAccount(accountId: number): Observable<BankMovement[]> {
     return this._movimenti$.pipe(
-      // Filtra l'array ogni volta che ne viene emesso uno nuovo
       map(movimenti => movimenti.filter(m => m.accountId === accountId))
     );
   }
 
   /**
-   * Cerca un movimento per ID (sincrono).
+   * Recupera un singolo movimento per ID (utile per l'edit form).
    */
   getById(id: number): BankMovement | undefined {
     return this._movimenti$.value.find(m => m.id === id);
   }
 
   /**
-   * Elimina un movimento per ID.
-   * Emette un nuovo array privo dell'elemento cancellato.
+   * Elimina un movimento dalla lista globale.
    */
   delete(id: number): void {
     const current = this._movimenti$.value;
@@ -81,27 +87,30 @@ export class MovimentiService {
 
   /**
    * Inserisce o Aggiorna un movimento.
-   * Gestisce automaticamente l'assegnazione dell'ID per i nuovi inserimenti.
+   * Gestisce anche l'assegnazione automatica della data di creazione (`createdAt`).
    */
   upsert(mov: BankMovement): void {
     const arr = [...this._movimenti$.value];
     const idx = arr.findIndex(m => m.id === mov.id);
     
     if (idx >= 0) {
-      // UPDATE
-      arr[idx] = { ...mov }; // Spread operator per sicurezza (copia)
+      // UPDATE: Se trovato, sostituisci
+      arr[idx] = { ...mov };
     } else {
-      // INSERT
+      // INSERT: Se nuovo, calcola ID e aggiungi
       const nextId = arr.length ? Math.max(...arr.map(m => m.id)) + 1 : 1;
-      // Impostiamo la data di creazione se non c'è
+      
       const newMov = { 
         ...mov, 
         id: nextId,
+        // Se non è fornita una data creazione, usa quella attuale
         createdAt: mov.createdAt || new Date().toISOString()
       };
+      
       arr.push(newMov);
     }
     
+    // Emette il nuovo stato dell'array
     this._movimenti$.next(arr);
   }
 }

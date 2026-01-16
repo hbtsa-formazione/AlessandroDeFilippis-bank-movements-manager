@@ -1,9 +1,13 @@
 import { Component, OnInit } from '@angular/core';
 
 /**
- * Componente Home (Dashboard).
- * Rappresenta la pagina iniziale dell'applicazione, fornendo un accesso rapido
- * alle funzionalità principali tramite delle "Card" di navigazione.
+ * =========================================================================================
+ * COMPONENT: HOME (DASHBOARD)
+ * =========================================================================================
+ * Pagina di atterraggio dell'applicazione.
+ * 
+ * Non contiene logica complessa, funge solo da menu di navigazione grafico.
+ * I link reali sono gestiti nel template HTML tramite la direttiva `routerLink`.
  */
 @Component({
   selector: 'app-home',
@@ -14,11 +18,8 @@ export class HomeComponent implements OnInit {
 
   constructor() { }
 
-  /**
-   * Lifecycle hook che viene chiamato dopo che Angular ha inizializzato le proprietà.
-   * Qui andrebbero eventuali chiamate iniziali ai service, se necessarie.
-   */
   ngOnInit(): void {
+    // Qui si potrebbero caricare statistiche globali o messaggi di benvenuto
   }
 
 }

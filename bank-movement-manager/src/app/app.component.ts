@@ -1,8 +1,12 @@
 import { Component } from '@angular/core';
 
 /**
- * Componente Root dell'applicazione.
- * Funge da contenitore principale (shell) per l'intera interfaccia utente.
+ * =========================================================================================
+ * COMPONENT: APP ROOT
+ * =========================================================================================
+ * È il componente radice dell'albero di Angular.
+ * Viene caricato per primo (bootstrap) e contiene il layout principale della pagina
+ * (es. Navbar, Footer e il tag <router-outlet> dove vengono caricate le pagine).
  */
 @Component({
   selector: 'app-root',
@@ -10,8 +14,5 @@ import { Component } from '@angular/core';
   styleUrls: ['./app.component.css']
 })
 export class AppComponent {
-  /**
-   * Titolo dell'applicazione, utilizzato per il tag <title> o nell'header.
-   */
   title = 'bank-movement-manager';
 }
