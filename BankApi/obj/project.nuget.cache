@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "J9yepo0wS9c=",
+  "success": true,
+  "projectFilePath": "C:\\Repository\\FORMAZIONE\\esercizi angular 3\\AlessandroDeFilippis-bank-movements-manager\\BankApi\\BankApi.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\AlessandroDeFilippis\\.nuget\\packages\\microsoft.aspnetcore.openapi\\9.0.11\\microsoft.aspnetcore.openapi.9.0.11.nupkg.sha512",
+    "C:\\Users\\AlessandroDeFilippis\\.nuget\\packages\\microsoft.openapi\\1.6.17\\microsoft.openapi.1.6.17.nupkg.sha512"
+  ],
+  "logs": []
+}

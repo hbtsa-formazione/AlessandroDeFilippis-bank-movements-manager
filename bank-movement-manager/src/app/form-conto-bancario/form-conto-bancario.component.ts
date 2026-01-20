@@ -1,15 +1,15 @@
-import { Component, OnInit } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { BankAccount } from '../model/bank-account';
-import { ContiService } from '../service/conti-service';
+import { Component, OnInit } from '@angular/core'; // Importiamo le interfacce base di Angular
+import { ActivatedRoute, Router } from '@angular/router'; // Importiamo gli strumenti di routing
+import { FormBuilder, FormGroup, Validators } from '@angular/forms'; // Importiamo gli strumenti per i Form Reattivi
+import { BankAccount } from '../model/bank-account'; // Importiamo il modello dati
+import { ContiService } from '../service/conti-service'; // Importiamo il servizio dati
 
 /**
  * =========================================================================================
  * COMPONENT: FORM CONTO BANCARIO
  * =========================================================================================
- * Gestisce sia la creazione (CREATE) che la modifica (UPDATE) di un conto bancario.
- * Utilizza i "Reactive Forms" di Angular, che offrono un controllo potente sulla validazione.
+ * Questo componente gestisce sia la Creazione (Create) che la Modifica (Update) di un conto.
+ * Usa lo stesso form HTML per entrambe le operazioni.
  */
 @Component({
   selector: 'app-form-conto-bancario',
@@ -19,88 +19,102 @@ import { ContiService } from '../service/conti-service';
 export class FormContoBancarioComponent implements OnInit {
   
   /**
-   * Il Reactive Form Group.
-   * Rappresenta l'intero modulo e contiene i controlli (input) al suo interno.
-   * Usiamo il modificatore `!` (Definite Assignment Assertion) per dire a TypeScript:
-   * "Fidati, inizializzerò questa variabile nel metodo ngOnInit, non sarà null".
+   * form: Variabile che conterrà il nostro "FormGroup".
+   * Il '!' serve a dire a TypeScript che la inizializzeremo sicuramente (in ngOnInit),
+   * quindi non deve preoccuparsi che possa essere null.
    */
   form!: FormGroup;
   
-  /** Stato del componente: true se stiamo modificando, false se stiamo creando */
+  /**
+   * isEdit: Flag booleano per sapere se siamo in modalità modifica (true) o creazione (false).
+   * Utile per cambiare titolo alla pagina o logica di salvataggio.
+   */
   isEdit = false;
   
-  /** Memorizza l'ID del conto che stiamo modificando (se presente) */
+  /**
+   * currentId: Memorizza l'ID del conto che stiamo modificando (opzionale).
+   */
   currentId?: number;
 
+  /**
+   * COSTRUTTORE
+   * @param fb - FormBuilder: servizio per creare FormGroup in modo veloce.
+   * @param route - ActivatedRoute: servizio per leggere i parametri dell'URL (es. l'ID).
+   * @param router - Router: servizio per navigare (cambiare pagina) via codice.
+   * @param contiService - ContiService: servizio per leggere/scrivere i dati dei conti.
+   */
   constructor(
-    private fb: FormBuilder,       // Helper per costruire form complessi in modo sintetico
-    private route: ActivatedRoute, // Accesso ai parametri dell'URL corrente (es. l'ID)
-    private router: Router,        // Per navigare via codice dopo il salvataggio
-    private contiService: ContiService // Accesso ai dati
+    private fb: FormBuilder,
+    private route: ActivatedRoute,
+    private router: Router,
+    private contiService: ContiService
   ) {}
 
   /**
-   * LIFECYCLE HOOK: ngOnInit
-   * Viene eseguito una sola volta appena il componente è stato inizializzato.
-   * È il posto giusto per configurare il form e caricare i dati.
+   * ngOnInit
+   * Viene eseguito appena il componente viene inizializzato.
+   * Qui costruiamo il form e carichiamo i dati se necessario.
    */
   ngOnInit(): void {
-    // 1. Costruzione del Form Model
+    // 1. Definiamo la struttura del Form (nomi dei campi e validatori).
     this.form = this.fb.group({
-      // Sintassi: ['ValoreIniziale', [ValidatoriSincroni]]
+      // Campo 'name': valore iniziale vuoto, obbligatorio, max 80 caratteri.
       name: ['', [Validators.required, Validators.maxLength(80)]],
+      // Campo 'iban': valore iniziale vuoto, obbligatorio, max 34 caratteri.
       iban: ['', [Validators.required, Validators.maxLength(34)]],
+      // Campo 'currency': valore iniziale 'EUR', obbligatorio.
       currency: ['EUR', [Validators.required]]
     });
 
-    // 2. Controllo se siamo in modalità Modifica
-    // route.snapshot.paramMap.get('id') recupera il parametro 'id' dall'URL
+    // 2. Controlliamo se nell'URL c'è un parametro 'id'.
+    // route.snapshot.paramMap.get('id') ci dà il valore corrente del parametro.
     const idParam = this.route.snapshot.paramMap.get('id');
     
+    // Se c'è un ID, vuol dire che siamo in MODIFICA.
     if (idParam) {
-      this.isEdit = true;
-      this.currentId = +idParam; // Il '+' converte la stringa in numero
+      this.isEdit = true; // Impostiamo la modalità modifica
+      this.currentId = +idParam; // Convertiamo la stringa in numero con '+'
       
-      // Recupero i dati attuali del conto dal service
-      const conto = this.contiService.getContoById(this.currentId);
-      
-      if (conto) {
-        // patchValue riempie il form con i dati dell'oggetto.
-        // I nomi delle proprietà dell'oggetto devono combaciare con i nomi dei controlli del form.
-        this.form.patchValue(conto);
-      } else {
-        // Edge case: L'utente ha messo un ID inesistente nell'URL
-        this.router.navigate(['/lista-conti-bancari']);
-      }
+      // Chiamiamo il servizio per ottenere i dati del conto dal server.
+      this.contiService.getContoById(this.currentId).subscribe({
+        // Successo: abbiamo ricevuto i dati (conto)
+        next: (conto) => {
+          // Riempiamo il form con i dati ricevuti.
+          // patchValue mappa automaticamente le proprietà dell'oggetto sui campi del form con lo stesso nome.
+          this.form.patchValue(conto);
+        },
+        // Errore: l'ID non esiste o il server è giù
+        error: () => {
+          // Torniamo alla lista per sicurezza.
+          this.router.navigate(['/lista-conti-bancari']);
+        }
+      });
     }
   }
 
   /**
-   * Gestione del salvataggio (Submit)
+   * salva
+   * Metodo chiamato quando l'utente preme il pulsante di salvataggio.
    */
   salva(): void {
-    // Se il form non è valido (es. campi obbligatori vuoti), blocchiamo tutto.
-    // (Anche il pulsante di submit dovrebbe essere disabilitato nella vista)
+    // Se il form non è valido (es. campi obbligatori vuoti), ci fermiamo subito.
     if (this.form.invalid) return;
 
-    // Preparazione del payload (oggetto da inviare)
-    // Combiniamo l'ID (se c'è) con i valori del form
+    // Creiamo l'oggetto da inviare al server.
+    // Usiamo lo spread operator (...) per copiare tutti i valori del form (name, iban, currency).
     const payload: BankAccount = {
-      id: this.currentId ?? 0, // 0 segnala al service che è un nuovo record
-      ...this.form.value       // Spread operator: copia tutte le proprietà del form (name, iban, currency)
+      id: this.currentId ?? 0, // Se c'è currentId lo usiamo, altrimenti 0 (nuovo conto).
+      ...this.form.value
     };
 
-    // Deleghiamo al service la logica di salvataggio
-    this.contiService.upsertConto(payload);
-    
-    // Torniamo alla lista
-    this.router.navigate(['/lista-conti-bancari']);
-  }
-
-  /**
-   * Tasto Annulla
-   */
-  annulla(): void {
-    this.router.navigate(['/lista-conti-bancari']);
+    // Chiamiamo il metodo upsertConto del servizio (gestisce sia Create che Update).
+    // È IMPORTANTE fare .subscribe(), altrimenti la chiamata non parte.
+    this.contiService.upsertConto(payload).subscribe({
+      next: () => {
+        // Quando il salvataggio è finito con successo, torniamo alla lista.
+        this.router.navigate(['/lista-conti-bancari']);
+      },
+      error: (err) => console.error('Errore salvataggio:', err)
+    });
   }
 }

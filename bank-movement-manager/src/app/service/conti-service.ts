@@ -1,119 +1,110 @@
-import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
-import { BankAccount } from '../model/bank-account';
+import { Injectable } from '@angular/core'; // Importiamo il decoratore base per i servizi
+import { HttpClient } from '@angular/common/http'; // Importiamo il client HTTP per fare chiamate API
+import { BehaviorSubject, Observable, tap } from 'rxjs'; // Importiamo gli strumenti per la programmazione reattiva
+import { BankAccount } from '../model/bank-account'; // Importiamo l'interfaccia del nostro modello dati
 
 /**
  * =========================================================================================
  * SERVICE: CONTI SERVICE
  * =========================================================================================
- * In Angular, i Service sono classi Singleton (ne esiste una sola istanza per applicazione)
- * che contengono la logica di business e la gestione dei dati.
- *
- * @Injectable({ providedIn: 'root' })
- * Questo decoratore dice ad Angular: "Questa classe è un servizio che può essere iniettato
- * in altri componenti. Creane una sola istanza globale disponibile ovunque (root)".
+ * Questa classe gestisce tutte le operazioni sui conti bancari.
+ * Fa da "ponte" tra i componenti Angular (la vista) e il server C# (i dati).
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root' // Rende questo servizio disponibile in tutta l'applicazione (Singleton)
 })
 export class ContiService {
   
-  /**
-   * STATE MANAGEMENT CON RXJS
-   * ---------------------------------------------------------------------------------------
-   * Utilizziamo un approccio reattivo per gestire lo stato dei conti.
-   *
-   * 1. `_conti$`: È un `BehaviorSubject`.
-   *    - Subject: È sia un Observable (puoi ascoltarlo) che un Observer (puoi emettere valori).
-   *    - Behavior: Mantiene in memoria l'ultimo valore emesso. Appena un componente si iscrive,
-   *      riceve subito l'ultimo valore disponibile (utile per caricare subito la UI).
-   *    - Private: È privato per impedire ai componenti di manipolare direttamente i dati.
-   *      Solo questo Service deve avere la responsabilità di modificare lo stato.
-   */
-  private readonly _conti$ = new BehaviorSubject<BankAccount[]>([
-    // Dati iniziali (Mock) per simulare un database
-    { id: 1, name: 'Conto Principale', iban: 'IT60X0542811101000000123456', currency: 'EUR' },
-    { id: 2, name: 'Conto Risparmi', iban: 'IT75X0100501010000000012345', currency: 'EUR' },
-    { id: 3, name: 'USD Account', iban: 'GB29XBAR60161331926819', currency: 'USD' },
-  ]);
+  // URL base dell'API C#. Deve corrispondere a quello mostrato da "dotnet run".
+  // Se il backend cambia porta, bisogna aggiornare solo questa riga.
+  private readonly apiUrl = 'http://localhost:5051/api/conti';
+
+  // BehaviorSubject è un tipo speciale di Observable che:
+  // 1. Ha un valore corrente (lo stato attuale).
+  // 2. Emette il valore corrente a chiunque si iscriva (subscribe).
+  // Lo usiamo per tenere sincronizzati tutti i componenti che mostrano la lista dei conti.
+  private _conti$ = new BehaviorSubject<BankAccount[]>([]);
 
   /**
-   * GETTER OSSERVABILE (READ-ONLY)
-   * ---------------------------------------------------------------------------------------
-   * Espone lo stato come `Observable`.
-   * I componenti useranno questo metodo per "abbonarsi" ai cambiamenti della lista conti.
-   * Ogni volta che la lista cambia (aggiunta/rimozione), tutti gli abbonati riceveranno
-   * automaticamente il nuovo array aggiornato.
-   * 
-   * @returns Un Observable che emette array di BankAccount.
+   * COSTRUTTORE
+   * Viene chiamato una volta sola quando l'app parte.
+   * @param http - Il client HttpClient iniettato da Angular per fare richieste web.
+   */
+  constructor(private http: HttpClient) {
+    // Appena il servizio nasce, proviamo a caricare i dati dal server.
+    this.loadAll();
+  }
+
+  /**
+   * Restituisce l'Observable dei conti.
+   * I componenti useranno questo metodo per "ascoltare" la lista dei conti.
+   * Usiamo .asObservable() per nascondere il BehaviorSubject e impedire modifiche esterne.
    */
   getConti$(): Observable<BankAccount[]> {
     return this._conti$.asObservable();
   }
 
   /**
-   * METODO SINCRONO (SNAPSHOT)
-   * ---------------------------------------------------------------------------------------
-   * A volte serve ottenere il valore *attuale* senza sottoscriversi a flussi futuri.
-   * `this._conti$.value` ci restituisce il valore corrente contenuto nel BehaviorSubject.
-   *
-   * @param id L'ID del conto da cercare.
-   * @returns L'oggetto BankAccount se trovato, altrimenti undefined.
+   * Metodo privato per caricare tutti i dati dal server.
+   * Viene chiamato internamente dopo ogni modifica (Create, Update, Delete)
+   * per assicurarsi che la lista locale sia sempre aggiornata con quella del server.
    */
-  getContoById(id: number): BankAccount | undefined {
-    return this._conti$.value.find(c => c.id === id);
+  private loadAll(): void {
+    // Faccio una GET all'URL dell'API. Mi aspetto un array di BankAccount.
+    this.http.get<BankAccount[]>(this.apiUrl)
+      .subscribe({
+        // Quando i dati arrivano (next):
+        next: (data) => {
+          // "Spariamo" i nuovi dati dentro il BehaviorSubject.
+          // Tutti i componenti in ascolto si aggiorneranno automaticamente.
+          this._conti$.next(data);
+        },
+        // Se c'è un errore:
+        error: (err) => console.error('Errore caricamento conti:', err)
+      });
   }
 
   /**
-   * ELIMINAZIONE (IMMUTABILITÀ)
-   * ---------------------------------------------------------------------------------------
-   * Per eliminare un elemento in un contesto reattivo, non modifichiamo l'array esistente (mutation).
-   * Invece, creiamo un NUOVO array che contiene tutti gli elementi tranne quello da eliminare.
-   * 
-   * Perché immutabile?
-   * Angular (e il change detection) rileva i cambiamenti molto più velocemente se l'oggetto/array
-   * cambia riferimento in memoria, invece di cambiare solo il suo contenuto interno.
+   * Ottiene un singolo conto per ID.
+   * Utile per la pagina di dettaglio o di modifica.
+   * @param id - L'ID del conto da cercare.
    */
-  deleteConto(id: number): void {
-    const currentList = this._conti$.value; // Prendo la lista attuale
-    const newList = currentList.filter(c => c.id !== id); // Creo nuova lista filtrata
-    this._conti$.next(newList); // Emetto la nuova lista a tutti gli iscritti
+  getContoById(id: number): Observable<BankAccount> {
+    // Chiamata GET: http://localhost:5051/api/conti/1
+    return this.http.get<BankAccount>(`${this.apiUrl}/${id}`);
   }
 
   /**
-   * UPSERT (UPDATE + INSERT)
-   * ---------------------------------------------------------------------------------------
-   * Un unico metodo per gestire sia la creazione che la modifica.
-   * Logica:
-   * 1. Copia l'array attuale (Spread Operator `[...]`) per non mutare l'originale.
-   * 2. Cerca se l'elemento esiste già (tramite ID).
-   * 3. Se esiste -> Sovrascrivi (Update).
-   * 4. Se non esiste -> Aggiungi con nuovo ID (Insert).
+   * Crea o Aggiorna un conto (Upsert).
+   * Se l'oggetto ha un ID > 0, facciamo UPDATE. Altrimenti CREATE.
    */
-  upsertConto(conto: BankAccount): void {
-    const arr = [...this._conti$.value]; // Copia difensiva (Shallow Copy)
-    
-    // Controllo se è un aggiornamento (l'oggetto ha un ID valido?)
-    if (conto.id) {
-      const idx = arr.findIndex(c => c.id === conto.id);
-      if (idx >= 0) {
-        // UPDATE: Sostituisco l'oggetto all'indice trovato
-        // Uso {...conto} per rompere il riferimento all'oggetto originale del form
-        arr[idx] = { ...conto }; 
-        this._conti$.next(arr); // Notifico il cambiamento
-        return;
-      }
+  upsertConto(conto: BankAccount): Observable<BankAccount> {
+    if (conto.id && conto.id > 0) {
+      // === UPDATE (PUT) ===
+      // Chiamata PUT: http://localhost:5051/api/conti/1
+      return this.http.put<BankAccount>(`${this.apiUrl}/${conto.id}`, conto).pipe(
+        // L'operatore tap esegue un'azione "laterale" senza modificare i dati del flusso.
+        // Qui lo usiamo per ricaricare la lista globale dopo il salvataggio.
+        tap(() => this.loadAll())
+      );
+    } else {
+      // === CREATE (POST) ===
+      // Chiamata POST: http://localhost:5051/api/conti
+      return this.http.post<BankAccount>(this.apiUrl, conto).pipe(
+        tap(() => this.loadAll())
+      );
     }
-    
-    // INSERT: Se arrivo qui, è un nuovo conto.
-    // Calcolo un nuovo ID simulando un database autoincrementale
-    // (Prendo l'ID massimo attuale e aggiungo 1)
-    const maxId = arr.length ? Math.max(...arr.map(c => c.id)) : 0;
-    
-    // Aggiungo il nuovo oggetto all'array copiato
-    arr.push({ ...conto, id: maxId + 1 });
-    
-    // Notifico il cambiamento a tutti gli observer
-    this._conti$.next(arr); 
+  }
+
+  /**
+   * Elimina un conto.
+   * @param id - L'ID del conto da eliminare.
+   */
+  deleteConto(id: number): Observable<void> {
+    // Chiamata DELETE: http://localhost:5051/api/conti/1
+    return this.http.delete<void>(`${this.apiUrl}/${id}`).pipe(
+      // Dopo aver eliminato, ricarichiamo la lista per far sparire l'elemento dalla UI.
+      tap(() => this.loadAll())
+    );
   }
 }

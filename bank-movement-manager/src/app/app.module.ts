@@ -9,6 +9,7 @@ import { ListaContiBancariComponent } from './lista-conti-bancari/lista-conti-ba
 import { ListaMovimentiComponent } from './lista-movimenti/lista-movimenti.component';
 import { FormContoBancarioComponent } from './form-conto-bancario/form-conto-bancario.component';
 import { FormMovimentoComponent } from './form-movimento/form-movimento.component';
+import { HttpClientModule } from '@angular/common/http';
 
 @NgModule({
   declarations: [
@@ -21,6 +22,7 @@ import { FormMovimentoComponent } from './form-movimento/form-movimento.componen
   ],
   imports: [
     BrowserModule,
+    HttpClientModule,
     ReactiveFormsModule,
     AppRoutingModule
   ],
