@@ -6,6 +6,8 @@
 // ==============================================================================================
 
 // Importiamo il "Builder" che serve a costruire l'applicazione web.
+using System.Security.Authentication;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ==============================================================================================
