@@ -21,6 +21,9 @@ import { ContiService } from '../service/conti-service'; // Importiamo il serviz
   styleUrls: ['./lista-conti-bancari.component.css']
 })
 export class ListaContiBancariComponent {
+tornaHome() {
+throw new Error('Method not implemented.');
+}
   
   /**
    * conti$: È un Observable che contiene l'array di conti bancari.

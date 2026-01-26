@@ -17,6 +17,7 @@ import { ContiService } from '../service/conti-service'; // Importiamo il serviz
   styleUrls: ['./form-conto-bancario.component.css']
 })
 export class FormContoBancarioComponent implements OnInit {
+[x: string]: any;
   
   /**
    * form: Variabile che conterrà il nostro "FormGroup".

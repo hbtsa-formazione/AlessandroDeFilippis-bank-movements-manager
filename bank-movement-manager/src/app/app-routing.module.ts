@@ -5,6 +5,7 @@ import { ListaContiBancariComponent } from './lista-conti-bancari/lista-conti-ba
 import { ListaMovimentiComponent } from './lista-movimenti/lista-movimenti.component';
 import { FormContoBancarioComponent } from './form-conto-bancario/form-conto-bancario.component';
 import { FormMovimentoComponent } from './form-movimento/form-movimento.component';
+import { ContiContabiliComponent } from './conti-contabili/conti-contabili.component';
 
 const routes: Routes = [
   { path: '', redirectTo: '/home', pathMatch: 'full' },
@@ -17,7 +18,8 @@ const routes: Routes = [
   { path: 'form-conto-bancario/:id', component: FormContoBancarioComponent },
   
   { path: 'form-movimento', component: FormMovimentoComponent },
-  { path: '**', redirectTo: '/home' }
+  { path: 'conti-contabili', component: ContiContabiliComponent },
+  { path: '**', redirectTo: '/home' },
 ];
 
 @NgModule({

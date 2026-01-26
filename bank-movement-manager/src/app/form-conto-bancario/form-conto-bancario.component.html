@@ -57,7 +57,7 @@
 
       <!-- Azioni -->
       <div class="flex-row flex-between" style="margin-top: 30px;">
-        <button class="btn btn-secondary" type="button" (click)="annulla()">Annulla</button>
+        <button class="btn btn-secondary" type="button" (click)="this['annulla']()">Annulla</button>
         <button class="btn btn-primary" type="submit" [disabled]="form.invalid">
           {{ isEdit ? 'Salva Modifiche' : 'Crea Conto' }}
         </button>
