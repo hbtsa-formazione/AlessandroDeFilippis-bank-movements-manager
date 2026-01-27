@@ -109,7 +109,7 @@ app.MapPost("/api/conti", (ContoBancario nuovoConto) =>
 {
     // Calcoliamo il nuovo ID: prendiamo il massimo ID attuale e aggiungiamo 1.
     // Se la lista è vuota, partiamo da 1.
-    int newId = conti.Any() ? conti.Max(c => c.Id) + 1 : 1;
+    int newId = conti.Count > 0 ? conti.Max(c => c.Id) + 1 : 1;
     nuovoConto.Id = newId;
 
     // Aggiungiamo il nuovo conto alla lista.

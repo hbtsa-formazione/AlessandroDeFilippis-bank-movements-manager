@@ -1,1 +1,3 @@
-/* Stili specifici per HomeComponent (vuoto, usa stili globali) */
+.home-icon {
+  font-size: 2rem;
+}
