@@ -1,7 +1,25 @@
-<p>tabella-conti works!</p>
-<ul>
-  <li>
-    {{ contiContabili|json}}
-  </li>
-</ul>
-
+<div class="card table-container">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>Codice</th>
+        <th>Descrizione</th>
+        <th>Tipo</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let c of contiContabili">
+        <td><strong>{{ c.nome }}</strong></td>
+        <td class="code-cell">{{ c.code }}</td>
+        <td>{{ c.description }}</td>
+        <td>{{ c.type }}</td>
+      </tr>
+      <tr *ngIf="contiContabili.length === 0">
+        <td colspan="4" class="empty-cell">
+          <p class="text-muted">Nessun conto contabile presente.</p>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
