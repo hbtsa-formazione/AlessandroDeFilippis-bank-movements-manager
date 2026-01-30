@@ -1,0 +1,11 @@
+.filter-row {
+  align-items: flex-end;
+}
+
+.filter-text {
+  flex: 1;
+}
+
+.filter-type {
+  width: 240px;
+}

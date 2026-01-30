@@ -6,6 +6,7 @@
         <th>Codice</th>
         <th>Descrizione</th>
         <th>Tipo</th>
+        <th class="actions-col">Azioni</th>
       </tr>
     </thead>
     <tbody>
@@ -14,9 +15,15 @@
         <td class="code-cell">{{ c.code }}</td>
         <td>{{ c.description }}</td>
         <td>{{ c.type }}</td>
+        <td>
+          <div class="actions">
+            <button type="button" class="btn btn-sm btn-secondary" (click)="edit.emit(c)">✏️</button>
+            <button type="button" class="btn btn-sm btn-danger" (click)="remove.emit(c)">🗑️</button>
+          </div>
+        </td>
       </tr>
       <tr *ngIf="contiContabili.length === 0">
-        <td colspan="4" class="empty-cell">
+        <td colspan="5" class="empty-cell">
           <p class="text-muted">Nessun conto contabile presente.</p>
         </td>
       </tr>

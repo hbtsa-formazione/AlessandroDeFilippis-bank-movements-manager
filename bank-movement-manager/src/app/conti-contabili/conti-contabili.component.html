@@ -3,5 +3,49 @@
     <h2>Conti Contabili</h2>
   </div>
 
-  <app-tabella-conti [contiContabili]="contiContabili"></app-tabella-conti>
+  <div class="card">
+    <div class="flex-row filter-row">
+      <div class="form-group filter-text">
+        <label for="filterText">Filtro testo</label>
+        <input id="filterText" type="text" class="form-control" (input)="onFilterText($event)" placeholder="Cerca per nome, codice o descrizione">
+      </div>
+      <div class="form-group filter-type">
+        <label for="filterType">Tipo</label>
+        <select id="filterType" class="form-control" (change)="onFilterType($event)">
+          <option value="">Tutti</option>
+          <option *ngFor="let t of availableTypes" [value]="t">{{ t }}</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <app-tabella-conti
+    [contiContabili]="contiFiltrati"
+    (edit)="startEdit($event)"
+    (remove)="deleteConto($event)"
+  ></app-tabella-conti>
+
+  <form class="card" [formGroup]="form">
+    <h3>{{ isEdit ? 'Modifica Conto Contabile' : 'Nuovo Conto Contabile' }}</h3>
+    <div class="form-group">
+      <label for="nome">Nome</label>
+      <input id="nome" type="text" class="form-control" formControlName="nome">
+    </div>
+    <div class="form-group">
+      <label for="code">Codice</label>
+      <input id="code" type="text" class="form-control" formControlName="code">
+    </div>
+    <div class="form-group">
+      <label for="description">Descrizione</label>
+      <input id="description" type="text" class="form-control" formControlName="description">
+    </div>
+    <div class="form-group">
+      <label for="type">Tipo</label>
+      <input id="type" type="text" class="form-control" formControlName="type">
+    </div>
+    <div class="flex-row">
+      <button type="button" class="btn btn-primary" (click)="save()" [disabled]="form.invalid">Salva</button>
+      <button type="button" class="btn btn-secondary" (click)="cancelEdit()" *ngIf="isEdit">Annulla</button>
+    </div>
+  </form>
 </div>
