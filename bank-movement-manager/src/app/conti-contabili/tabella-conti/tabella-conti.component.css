@@ -1,17 +1,27 @@
+/* =========================================================================================
+   STILI: TABELLA CONTI CONTABILI
+   =========================================================================================
+   Regole di presentazione per la tabella e i pulsanti azione.
+*/
+
+/* Visualizza i codici in font monospazio per migliorarne la leggibilità */
 .code-cell {
   font-family: monospace;
 }
 
+/* Messaggio centrato quando la tabella è vuota */
 .empty-cell {
   text-align: center;
   padding: 20px;
 }
 
+/* Layout orizzontale dei pulsanti azione */
 .actions {
   display: flex;
   gap: 8px;
 }
 
+/* Colonna azioni con larghezza consistente */
 .actions-col {
   width: 140px;
 }

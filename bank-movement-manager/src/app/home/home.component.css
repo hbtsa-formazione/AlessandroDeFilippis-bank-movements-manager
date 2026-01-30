@@ -1,3 +1,10 @@
+/* =========================================================================================
+   STILI: HOME COMPONENT
+   =========================================================================================
+   Regole minime per rendere le card della dashboard più leggibili.
+*/
+
+/* Dimensione delle icone nelle card della home */
 .home-icon {
   font-size: 2rem;
 }

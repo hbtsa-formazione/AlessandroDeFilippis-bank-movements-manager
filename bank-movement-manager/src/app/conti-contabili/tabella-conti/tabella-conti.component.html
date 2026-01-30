@@ -1,5 +1,7 @@
+<!-- Card contenitore della tabella conti contabili -->
 <div class="card table-container">
   <table class="table">
+    <!-- Intestazioni colonne -->
     <thead>
       <tr>
         <th>Nome</th>
@@ -10,18 +12,21 @@
       </tr>
     </thead>
     <tbody>
+      <!-- Righe dinamiche dei conti -->
       <tr *ngFor="let c of contiContabili">
         <td><strong>{{ c.nome }}</strong></td>
         <td class="code-cell">{{ c.code }}</td>
         <td>{{ c.description }}</td>
         <td>{{ c.type }}</td>
         <td>
+          <!-- Pulsanti azione emettono eventi al componente padre -->
           <div class="actions">
             <button type="button" class="btn btn-sm btn-secondary" (click)="edit.emit(c)">✏️</button>
             <button type="button" class="btn btn-sm btn-danger" (click)="remove.emit(c)">🗑️</button>
           </div>
         </td>
       </tr>
+      <!-- Stato vuoto quando non ci sono conti -->
       <tr *ngIf="contiContabili.length === 0">
         <td colspan="5" class="empty-cell">
           <p class="text-muted">Nessun conto contabile presente.</p>

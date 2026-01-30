@@ -1,14 +1,20 @@
+<!-- Pagina Lista Conti Bancari -->
 <div class="container">
+  <!-- Header con titolo e pulsanti azione -->
   <div class="flex-row flex-between" style="margin-bottom: 24px;">
     <h2>Lista Conti Bancari</h2>
     <div class="flex-row">
+      <!-- Navigazione rapida -->
       <button class="btn btn-secondary" (click)="tornaHome()">🏠 Home</button>
+      <!-- Creazione nuovo conto -->
       <button class="btn btn-primary" (click)="nuovoConto()">➕ Nuovo Conto</button>
     </div>
   </div>
 
+  <!-- Tabella conti -->
   <div class="card table-container">
     <table class="table">
+      <!-- Intestazioni colonne -->
       <thead>
         <tr>
           <th>Nome</th>
@@ -18,17 +24,20 @@
         </tr>
       </thead>
       <tbody>
+        <!-- Righe dinamiche con trackBy per performance -->
         <tr *ngFor="let c of conti$ | async; trackBy: trackById">
           <td><strong>{{ c.name }}</strong></td>
           <td style="font-family: monospace;">{{ c.iban }}</td>
           <td>{{ c.currency }}</td>
           <td>
             <div class="flex-row" style="gap: 8px;">
+              <!-- Azioni per singolo conto -->
               <button class="btn btn-sm btn-secondary" (click)="modificaConto(c)">✏️</button>
               <button class="btn btn-sm btn-danger" (click)="eliminaConto(c)">🗑️</button>
             </div>
           </td>
         </tr>
+        <!-- Stato vuoto -->
         <tr *ngIf="(conti$ | async)?.length === 0">
           <td colspan="4" style="text-align: center; padding: 20px;">
             <p class="text-muted">Nessun conto presente.</p>

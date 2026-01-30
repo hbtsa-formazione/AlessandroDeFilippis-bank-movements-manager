@@ -1,14 +1,19 @@
+<!-- Container principale della dashboard -->
 <div class="home-container">
+  <!-- Titolo e sottotitolo introduttivo -->
   <h1>Benvenuto in Bank Manager</h1>
   <p class="text-muted">Gestisci i tuoi conti e movimenti in modo semplice e sicuro.</p>
 
+  <!-- Griglia di card navigabili -->
   <div class="grid-2">
     <!-- Card Gestione Conti -->
     <a class="card" routerLink="/lista-conti-bancari">
       <div class="flex-row">
+        <!-- Icona illustrativa della sezione -->
         <div class="home-icon">🏦</div>
         <div>
           <h3>Conti Bancari</h3>
+          <!-- Descrizione breve della sezione -->
           <p>Visualizza saldi, dettagli IBAN e gestisci i tuoi conti correnti.</p>
         </div>
       </div>
@@ -17,9 +22,11 @@
     <!-- Card Gestione Movimenti -->
     <a class="card" routerLink="/lista-movimenti">
       <div class="flex-row">
+        <!-- Icona illustrativa della sezione -->
         <div class="home-icon">📑</div>
         <div>
           <h3>Movimenti</h3>
+          <!-- Descrizione breve della sezione -->
           <p>Consulta lo storico delle transazioni, entrate e uscite.</p>
         </div>
       </div>
@@ -28,9 +35,11 @@
     <!-- Card Nuovo Conto -->
     <a class="card" routerLink="/form-conto-bancario">
       <div class="flex-row">
+        <!-- Icona illustrativa della sezione -->
         <div class="home-icon">✍️</div>
         <div>
           <h3>Apri Nuovo Conto</h3>
+          <!-- Descrizione breve della sezione -->
           <p>Aggiungi un nuovo conto bancario al tuo portafoglio.</p>
         </div>
       </div>
@@ -39,16 +48,20 @@
     <!-- Card Nuovo Movimento -->
     <a class="card" routerLink="/form-movimento">
       <div class="flex-row">
+        <!-- Icona illustrativa della sezione -->
         <div class="home-icon">➕</div>
         <div>
           <h3>Registra Movimento</h3>
+          <!-- Descrizione breve della sezione -->
           <p>Inserisci manualmente un bonifico, un pagamento o un incasso.</p>
         </div>
       </div>
     </a>
 
-        <a class="card" routerLink="/conti-contabili">
+    <!-- Card Conti Contabili -->
+    <a class="card" routerLink="/conti-contabili">
       <div class="flex-row">
+        <!-- Icona illustrativa della sezione -->
         <div class="home-icon">📑</div>
         <div>
           <h3>Conti Contabili</h3>

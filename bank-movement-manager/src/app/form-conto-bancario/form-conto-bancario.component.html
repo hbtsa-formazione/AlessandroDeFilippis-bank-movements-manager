@@ -1,10 +1,14 @@
+<!-- Pagina Form Conto Bancario -->
 <div class="container">
+  <!-- Card centrale con form -->
   <div class="card" style="max-width: 600px; margin: 0 auto;">
+    <!-- Titolo dinamico in base alla modalità -->
     <h2>{{ isEdit ? 'Modifica Conto' : 'Nuovo Conto' }}</h2>
     <p style="color: #666; margin-bottom: 20px;">
       Compila i dettagli del conto bancario qui sotto.
     </p>
 
+    <!-- Form reattivo -->
     <form [formGroup]="form" (ngSubmit)="salva()">
       <!-- Nome Conto -->
       <div class="form-group">
@@ -36,6 +40,7 @@
           style="font-family: monospace;"
           [class.invalid]="form.get('iban')?.invalid && form.get('iban')?.touched">
         
+        <!-- Messaggi di errore -->
         <div class="alert alert-danger" *ngIf="form.get('iban')?.invalid && form.get('iban')?.touched" style="margin-top: 5px; padding: 5px 10px; font-size: 0.8rem;">
           <span *ngIf="form.get('iban')?.errors?.['required']">L'IBAN è obbligatorio.</span>
           <span *ngIf="form.get('iban')?.errors?.['maxlength']">Lunghezza non valida.</span>
@@ -57,7 +62,9 @@
 
       <!-- Azioni -->
       <div class="flex-row flex-between" style="margin-top: 30px;">
+        <!-- Annulla: torna indietro senza salvare -->
         <button class="btn btn-secondary" type="button" (click)="this['annulla']()">Annulla</button>
+        <!-- Submit: salva i dati -->
         <button class="btn btn-primary" type="submit" [disabled]="form.invalid">
           {{ isEdit ? 'Salva Modifiche' : 'Crea Conto' }}
         </button>

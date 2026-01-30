@@ -1,7 +1,8 @@
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
-import { ReactiveFormsModule } from '@angular/forms'; // Importa ReactiveFormsModule per i moduli reattivi (per ora usare template form, vedi angular 102)
+import { ReactiveFormsModule } from '@angular/forms';
 import { AppRoutingModule } from './app-routing.module';
+import { HttpClientModule } from '@angular/common/http';
 
 import { AppComponent } from './app.component';
 import { HomeComponent } from './home/home.component';
@@ -9,12 +10,21 @@ import { ListaContiBancariComponent } from './lista-conti-bancari/lista-conti-ba
 import { ListaMovimentiComponent } from './lista-movimenti/lista-movimenti.component';
 import { FormContoBancarioComponent } from './form-conto-bancario/form-conto-bancario.component';
 import { FormMovimentoComponent } from './form-movimento/form-movimento.component';
-import { HttpClientModule } from '@angular/common/http';
 import { ContiContabiliComponent } from './conti-contabili/conti-contabili.component';
 import { TabellaContiComponent } from './conti-contabili/tabella-conti/tabella-conti.component';
 
+/**
+ * =========================================================================================
+ * MODULE: APP MODULE (RADICE)
+ * =========================================================================================
+ * È il punto di ingresso dell'app Angular:
+ * - Dichiara i componenti usati nell'app.
+ * - Importa i moduli necessari (browser, routing, HTTP, forms).
+ * - Indica il componente di bootstrap (AppComponent).
+ */
 @NgModule({
   declarations: [
+    // Componenti UI dichiarati nel modulo
     AppComponent,
     HomeComponent,
     ListaContiBancariComponent,
@@ -25,11 +35,16 @@ import { TabellaContiComponent } from './conti-contabili/tabella-conti/tabella-c
     TabellaContiComponent
   ],
   imports: [
+    // Modulo base per eseguire l'app nel browser
     BrowserModule,
+    // Abilita le chiamate HTTP verso API esterne
     HttpClientModule,
+    // Abilita i Reactive Forms (FormGroup, FormControl)
     ReactiveFormsModule,
+    // Modulo di routing con le rotte dell'app
     AppRoutingModule
   ],
+  // Componente radice che Angular carica per primo
   bootstrap: [AppComponent]
 })
 export class AppModule { }

@@ -3,16 +3,21 @@
   Contiene la barra di navigazione fissa in alto e il router-outlet
   dove vengono caricati dinamicamente i componenti delle pagine.
 -->
+<!-- Navbar principale con link di navigazione -->
 <nav class="navbar">
+  <!-- Logo/brand che riporta alla home -->
   <a routerLink="/home" class="navbar-brand">Bank Manager</a>
   <div class="nav-links">
+    <!-- Link routerLink: Angular aggiorna la rotta senza ricaricare la pagina -->
     <a routerLink="/home" routerLinkActive="active">Dashboard</a>
     <a routerLink="/lista-conti-bancari" routerLinkActive="active">Conti</a>
     <a routerLink="/lista-movimenti" routerLinkActive="active">Movimenti</a>
+    <!-- Esempio di interpolazione dati dal componente -->
     {{myVariable}}
   </div>
 </nav>
 
+<!-- Contenitore principale dove viene renderizzato il componente della rotta attiva -->
 <div class="container">
   <!-- Qui Angular inietta il componente corrispondente alla rotta attiva -->
   <router-outlet></router-outlet>

@@ -1,8 +1,12 @@
+<!-- Pagina Form Movimento -->
 <div class="container">
+  <!-- Card centrale con form -->
   <div class="card" style="max-width: 600px; margin: 0 auto;">
+    <!-- Titolo dinamico in base alla modalità -->
     <h2>{{ isEditMode ? 'Modifica Movimento' : 'Registra Movimento' }}</h2>
     <p class="text-muted mb-3">Inserisci i dettagli della transazione.</p>
 
+    <!-- Form reattivo -->
     <form [formGroup]="form" (ngSubmit)="onSave()">
       
       <!-- Selezione Conto -->
@@ -18,6 +22,7 @@
             {{ account.name }} ({{ account.currency }})
           </option>
         </select>
+        <!-- Messaggio errore per selezione conto -->
         <div class="alert alert-danger" *ngIf="form.get('accountId')?.invalid && form.get('accountId')?.touched" style="margin-top: 5px; padding: 5px;">
           Seleziona un conto valido.
         </div>
@@ -65,13 +70,16 @@
             formControlName="amount"
             placeholder="0.00"
             [class.invalid]="form.get('amount')?.invalid && form.get('amount')?.touched">
+          <!-- Suggerimento per inserire uscite -->
           <small class="text-muted">Usa il segno meno (-) per le uscite.</small>
         </div>
       </div>
 
       <!-- Pulsanti -->
       <div class="flex-row flex-between" style="margin-top: 24px;">
+        <!-- Annulla e torna alla lista -->
         <button type="button" class="btn btn-secondary" (click)="onCancel()">Annulla</button>
+        <!-- Salva il movimento -->
         <button type="submit" class="btn btn-primary" [disabled]="!form.valid">
           {{ isEditMode ? 'Salva Modifiche' : 'Registra' }}
         </button>

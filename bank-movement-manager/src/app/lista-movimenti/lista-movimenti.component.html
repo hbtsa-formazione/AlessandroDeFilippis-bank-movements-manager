@@ -1,14 +1,20 @@
+<!-- Pagina Lista Movimenti -->
 <div class="container">
+  <!-- Header con azioni principali -->
   <div class="flex-row flex-between" style="margin-bottom: 24px;">
     <h2>Lista Movimenti</h2>
     <div class="flex-row">
+      <!-- Navigazione rapida -->
       <button class="btn btn-secondary" (click)="onBackToHome()">🏠 Home</button>
+      <!-- Creazione nuovo movimento -->
       <button class="btn btn-primary" (click)="onCreateNew()">➕ Nuovo Movimento</button>
     </div>
   </div>
 
+  <!-- Tabella movimenti -->
   <div class="card table-container">
     <table class="table" *ngIf="movementsWithAccounts$ | async as movements">
+      <!-- Intestazioni colonne -->
       <thead>
         <tr>
           <th>Data</th>
@@ -20,9 +26,11 @@
         </tr>
       </thead>
       <tbody>
+        <!-- Righe dinamiche dei movimenti -->
         <tr *ngFor="let mov of movements">
           <td>{{ mov.date | date:'dd/MM/yyyy' }}</td>
           <td>
+            <!-- Nome conto e IBAN arricchiti dal componente -->
             <div><strong>{{ mov.accountName }}</strong></div>
             <div style="font-size: 0.85rem; color: #666;">{{ mov.accountIban }}</div>
           </td>
@@ -33,11 +41,13 @@
           </td>
           <td>
             <div class="flex-row" style="gap: 8px;">
+              <!-- Azioni sul movimento -->
               <button class="btn btn-sm btn-warning" (click)="onEdit(mov)">✏️</button>
               <button class="btn btn-sm btn-danger" (click)="onDelete(mov)">🗑️</button>
             </div>
           </td>
         </tr>
+        <!-- Stato vuoto -->
         <tr *ngIf="(movementsWithAccounts$ | async)?.length === 0">
           <td colspan="6" style="text-align: center; padding: 20px;">
             <p class="text-muted">Nessun movimento registrato.</p>
@@ -49,6 +59,7 @@
 
   <!-- Sezione Statistiche Rapide -->
   <div class="grid-2">
+    <!-- Totali per valuta -->
     <div class="card">
       <h3>Totali per Valuta</h3>
       <table class="table">
@@ -61,6 +72,7 @@
       </table>
     </div>
 
+    <!-- Totali per conto -->
     <div class="card">
       <h3>Totali per Conto</h3>
       <table class="table">

@@ -1,11 +1,20 @@
+/* =========================================================================================
+   STILI: CONTI CONTABILI
+   =========================================================================================
+   Regole di layout per la sezione filtri della pagina Conti Contabili.
+*/
+
+/* Allinea gli input filtro alla stessa linea base */
 .filter-row {
   align-items: flex-end;
 }
 
+/* Campo filtro testuale cresce per occupare spazio disponibile */
 .filter-text {
   flex: 1;
 }
 
+/* Larghezza fissa per il filtro a tendina */
 .filter-type {
   width: 240px;
 }
