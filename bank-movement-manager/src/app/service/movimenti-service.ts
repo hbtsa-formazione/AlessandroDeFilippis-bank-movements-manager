@@ -52,6 +52,16 @@ export class MovimentiService {
   }
 
   /**
+   * Calcola il saldo corrente di un conto sommando tutti i movimenti.
+   * È una stima basata sullo storico locale dei movimenti.
+   */
+  getBalanceForAccount(accountId: number): number {
+    return this._movimenti$.value
+      .filter(m => m.accountId === accountId)
+      .reduce((sum, mov) => sum + mov.amount, 0);
+  }
+
+  /**
    * OPERATORE PIPE E MAP
    * ---------------------------------------------------------------------------------------
    * Questo metodo restituisce un Observable che emette SOLO i movimenti di un certo conto.
@@ -86,6 +96,43 @@ export class MovimentiService {
   }
 
   /**
+   * Crea una serie di movimenti rateizzati con importo fisso.
+   * Ogni rata viene pianificata su base mensile a partire da una data iniziale.
+   */
+  createInstallmentPayments(params: {
+    accountId: number;
+    startDate: string;
+    description: string;
+    currency: string;
+    amountPerInstallment: number;
+    count: number;
+  }): void {
+    const arr = [...this._movimenti$.value];
+    let nextId = this.getNextId(arr);
+
+    for (let i = 0; i < params.count; i++) {
+      const installmentDate = this.addMonths(params.startDate, i);
+
+      const newMov: BankMovement = {
+        id: nextId,
+        accountId: params.accountId,
+        date: installmentDate,
+        description: `${params.description} (Rata ${i + 1}/${params.count})`,
+        currency: params.currency,
+        amount: params.amountPerInstallment,
+        direction: 'debit',
+        category: 'Rateizzato',
+        createdAt: new Date().toISOString()
+      };
+
+      arr.push(newMov);
+      nextId += 1;
+    }
+
+    this._movimenti$.next(arr);
+  }
+
+  /**
    * Inserisce o Aggiorna un movimento.
    * Gestisce anche l'assegnazione automatica della data di creazione (`createdAt`).
    */
@@ -112,5 +159,22 @@ export class MovimentiService {
     
     // Emette il nuovo stato dell'array
     this._movimenti$.next(arr);
+  }
+
+  /**
+   * Calcola il prossimo ID disponibile in base ai movimenti esistenti.
+   */
+  private getNextId(arr: BankMovement[]): number {
+    return arr.length ? Math.max(...arr.map(m => m.id)) + 1 : 1;
+  }
+
+  /**
+   * Aggiunge mesi a una data ISO (YYYY-MM-DD) e restituisce lo stesso formato.
+   */
+  private addMonths(dateIso: string, monthsToAdd: number): string {
+    const baseDate = new Date(dateIso);
+    const result = new Date(baseDate);
+    result.setMonth(result.getMonth() + monthsToAdd);
+    return result.toISOString().substring(0, 10);
   }
 }

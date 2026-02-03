@@ -23,6 +23,9 @@ export class FormMovimentoComponent implements OnInit {
   
   form: FormGroup;
   isEditMode = false;
+  showInsufficientFunds = false;
+  requiredInstallmentTotal = 0;
+  availableBalance = 0;
   
   /**
    * Observable per popolare la Select Box dei conti nel template.
@@ -49,11 +52,19 @@ export class FormMovimentoComponent implements OnInit {
       date: [new Date().toISOString().substring(0, 10), Validators.required], 
       description: ['', Validators.required],
       currency: ['EUR', Validators.required],
-      amount: ['', [Validators.required]] 
+      amount: ['', [Validators.required]],
+      isInstallment: [false],
+      installments: [1]
     });
 
     // Colleghiamo l'observable dei conti dal service
     this.accounts$ = this.contiService.getConti$();
+
+    // Attiva/Disattiva le validazioni delle rate in base al toggle
+    this.form.get('isInstallment')?.valueChanges.subscribe((value) => {
+      this.updateInstallmentValidators(!!value);
+    });
+    this.updateInstallmentValidators(false);
   }
 
   ngOnInit(): void {
@@ -72,7 +83,9 @@ export class FormMovimentoComponent implements OnInit {
           date: movement.date,
           description: movement.description,
           currency: movement.currency,
-          amount: movement.amount
+          amount: movement.amount,
+          isInstallment: false,
+          installments: 1
         });
       } else {
         // ID non trovato -> redirect
@@ -84,6 +97,33 @@ export class FormMovimentoComponent implements OnInit {
   onSave(): void {
     if (this.form.valid) {
       const formValue = this.form.value;
+      const accountId = +formValue.accountId;
+      const isInstallment = !!formValue.isInstallment;
+      const installments = +formValue.installments || 1;
+      const amountValue = +formValue.amount;
+
+      if (!this.isEditMode && isInstallment) {
+        const perInstallmentAmount = -Math.abs(amountValue);
+        const requiredTotal = Math.abs(perInstallmentAmount) * installments;
+        const balance = this.movimentiService.getBalanceForAccount(accountId);
+
+        if (balance < requiredTotal) {
+          this.showInsufficientFundsPopup(balance, requiredTotal);
+          return;
+        }
+
+        this.movimentiService.createInstallmentPayments({
+          accountId,
+          startDate: formValue.date,
+          description: formValue.description,
+          currency: formValue.currency,
+          amountPerInstallment: perInstallmentAmount,
+          count: installments
+        });
+
+        this.router.navigate(['/lista-movimenti']);
+        return;
+      }
       
       // Costruzione dell'oggetto Model dai dati del Form
       const movement: BankMovement = {
@@ -92,8 +132,8 @@ export class FormMovimentoComponent implements OnInit {
         
         // Conversione tipi: i valori dei form HTML sono sempre stringhe,
         // dobbiamo convertirli in numeri con il prefisso '+' (unary plus)
-        accountId: +formValue.accountId,
-        amount: +formValue.amount,
+        accountId,
+        amount: amountValue,
         
         // Stringhe semplici
         date: formValue.date,
@@ -111,5 +151,42 @@ export class FormMovimentoComponent implements OnInit {
 
   onCancel(): void {
     this.router.navigate(['/lista-movimenti']);
+  }
+
+  closeInsufficientFundsPopup(): void {
+    this.showInsufficientFunds = false;
+    this.requiredInstallmentTotal = 0;
+    this.availableBalance = 0;
+  }
+
+  showExamplePopup(): void {
+    this.showInsufficientFundsPopup(120.00, 480.00);
+  }
+
+  getInstallmentTotal(): number {
+    const amountValue = +this.form.value.amount || 0;
+    const installments = +this.form.value.installments || 0;
+    return Math.abs(amountValue) * installments;
+  }
+
+  private updateInstallmentValidators(isInstallment: boolean): void {
+    const installmentsControl = this.form.get('installments');
+
+    if (!installmentsControl) return;
+
+    if (isInstallment) {
+      installmentsControl.setValidators([Validators.required, Validators.min(2), Validators.max(120)]);
+    } else {
+      installmentsControl.setValidators([]);
+      installmentsControl.setValue(1, { emitEvent: false });
+    }
+
+    installmentsControl.updateValueAndValidity({ emitEvent: false });
+  }
+
+  private showInsufficientFundsPopup(balance: number, requiredTotal: number): void {
+    this.availableBalance = balance;
+    this.requiredInstallmentTotal = requiredTotal;
+    this.showInsufficientFunds = true;
   }
 }
