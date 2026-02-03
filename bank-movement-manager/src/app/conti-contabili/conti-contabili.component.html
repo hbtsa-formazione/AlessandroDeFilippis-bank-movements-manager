@@ -1,19 +1,16 @@
 <!-- Pagina Conti Contabili: filtri, tabella e form CRUD -->
 <div class="container">
-  <!-- Header pagina -->
   <div class="flex-row flex-between">
     <h2>Conti Contabili</h2>
+    <button type="button" class="btn btn-primary" (click)="openCreateForm()">➕ Nuovo Conto</button>
   </div>
 
-  <!-- Card filtri -->
   <div class="card">
     <div class="flex-row filter-row">
-      <!-- Filtro testuale: nome, codice, descrizione -->
       <div class="form-group filter-text">
         <label for="filterText">Filtro testo</label>
         <input id="filterText" type="text" class="form-control" (input)="onFilterText($event)" placeholder="Cerca per nome, codice o descrizione">
       </div>
-      <!-- Filtro per tipologia -->
       <div class="form-group filter-type">
         <label for="filterType">Tipo</label>
         <select id="filterType" class="form-control" (change)="onFilterType($event)">
@@ -24,37 +21,37 @@
     </div>
   </div>
 
-  <!-- Tabella presentazionale con eventi di edit/delete -->
   <app-tabella-conti
     [contiContabili]="contiFiltrati"
-    (edit)="startEdit($event)"
+    (edit)="openEditForm($event)"
     (remove)="deleteConto($event)"
   ></app-tabella-conti>
 
-  <!-- Form reattivo per creazione/modifica -->
-  <form class="card" [formGroup]="form">
-    <!-- Titolo dinamico in base allo stato di edit -->
-    <h3>{{ isEdit ? 'Modifica Conto Contabile' : 'Nuovo Conto Contabile' }}</h3>
-    <div class="form-group">
-      <label for="nome">Nome</label>
-      <input id="nome" type="text" class="form-control" formControlName="nome">
+  <div class="modal-backdrop" *ngIf="isFormOpen">
+    <div class="modal-card">
+      <form class="card" [formGroup]="form">
+        <h3>{{ isEdit ? 'Modifica Conto Contabile' : 'Nuovo Conto Contabile' }}</h3>
+        <div class="form-group">
+          <label for="nome">Nome</label>
+          <input id="nome" type="text" class="form-control" formControlName="nome">
+        </div>
+        <div class="form-group">
+          <label for="code">Codice</label>
+          <input id="code" type="text" class="form-control" formControlName="code">
+        </div>
+        <div class="form-group">
+          <label for="description">Descrizione</label>
+          <input id="description" type="text" class="form-control" formControlName="description">
+        </div>
+        <div class="form-group">
+          <label for="type">Tipo</label>
+          <input id="type" type="text" class="form-control" formControlName="type">
+        </div>
+        <div class="flex-row">
+          <button type="button" class="btn btn-primary" (click)="save()" [disabled]="form.invalid">Salva</button>
+          <button type="button" class="btn btn-secondary" (click)="closeForm()">Chiudi</button>
+        </div>
+      </form>
     </div>
-    <div class="form-group">
-      <label for="code">Codice</label>
-      <input id="code" type="text" class="form-control" formControlName="code">
-    </div>
-    <div class="form-group">
-      <label for="description">Descrizione</label>
-      <input id="description" type="text" class="form-control" formControlName="description">
-    </div>
-    <div class="form-group">
-      <label for="type">Tipo</label>
-      <input id="type" type="text" class="form-control" formControlName="type">
-    </div>
-    <!-- Pulsanti azione -->
-    <div class="flex-row">
-      <button type="button" class="btn btn-primary" (click)="save()" [disabled]="form.invalid">Salva</button>
-      <button type="button" class="btn btn-secondary" (click)="cancelEdit()" *ngIf="isEdit">Annulla</button>
-    </div>
-  </form>
+  </div>
 </div>

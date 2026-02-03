@@ -63,6 +63,8 @@ export class ContiContabiliComponent implements OnInit {
    */
   isEdit = false;
 
+  isFormOpen = false;
+
   /**
    * ID dell'elemento in modifica.
    * È undefined in modalità creazione.
@@ -148,7 +150,7 @@ export class ContiContabiliComponent implements OnInit {
    * - Salva l'ID corrente
    * - Riempie il form con i dati selezionati
    */
-  startEdit(conto: ContiContabili): void {
+  openEditForm(conto: ContiContabili): void {
     this.isEdit = true;
     this.currentId = conto.id;
     this.form.patchValue({
@@ -157,6 +159,14 @@ export class ContiContabiliComponent implements OnInit {
       description: conto.description,
       type: conto.type
     });
+    this.isFormOpen = true;
+  }
+
+  openCreateForm(): void {
+    this.isEdit = false;
+    this.currentId = undefined;
+    this.form.reset({ nome: '', code: '', description: '', type: '' });
+    this.isFormOpen = true;
   }
 
   /**
@@ -164,10 +174,11 @@ export class ContiContabiliComponent implements OnInit {
    * - Reset dei flag
    * - Pulizia del form
    */
-  cancelEdit(): void {
+  closeForm(): void {
     this.isEdit = false;
     this.currentId = undefined;
     this.form.reset({ nome: '', code: '', description: '', type: '' });
+    this.isFormOpen = false;
   }
 
   /**
@@ -192,7 +203,7 @@ export class ContiContabiliComponent implements OnInit {
       this.contiContabiliService.createConto(payload);
     }
 
-    this.cancelEdit();
+    this.closeForm();
   }
 
   /**
