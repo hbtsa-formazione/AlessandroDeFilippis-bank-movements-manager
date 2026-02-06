@@ -1,27 +1,128 @@
-# BankMovementManager
+# Bank Movement Manager — Guida Passo Passo
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 14.2.13.
+## Panoramica
+Applicazione Angular per gestire conti bancari e movimenti. Include:
+- CRUD conti bancari
+- CRUD movimenti con calcolo statistiche
+- Pagamenti rateizzati con controllo liquidità e pop-up di avviso
+- Gestione conti contabili (piano dei conti) in memoria
 
-## Development server
+## Avvio rapido
+- Avvio frontend: `npm start` e apri `http://localhost:4200/`
+- Build: `npm run build`
+- Test: `npm test`
+- Backend C#: avvio nella cartella `BankApi` con `dotnet run` (vedi README in BankApi)
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
+## Architettura
+- Modulo radice: `src/app/app.module.ts`
+- Routing: `src/app/app-routing.module.ts`
+  - `home`, `lista-conti-bancari`, `lista-movimenti`, `form-conto-bancario`, `form-movimento`, `conti-contabili`
 
-## Code scaffolding
+## Componenti
+### Home
+- Scopo: dashboard con link alle sezioni principali
+- File: `src/app/home/home.component.ts` / `.html` / `.css`
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+### Lista Conti Bancari
+- Scopo: tabella dei conti, azioni crea/modifica/elimina e navigazione al form
+- Dati: `ContiService.getConti$()` (Observable)
+- File: `src/app/lista-conti-bancari/lista-conti-bancari.component.ts` / `.html` / `.css`
 
-## Build
+### Form Conto Bancario
+- Scopo: creazione/modifica conto con Reactive Forms e validazioni
+- Flusso:
+  - In modalità modifica, legge `:id` dalla rotta e carica il conto via HTTP
+  - Salvataggio tramite `ContiService.upsertConto`
+- File: `src/app/form-conto-bancario/form-conto-bancario.component.ts` / `.html` / `.css`
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
+### Lista Movimenti
+- Scopo: tabella movimenti arricchita con dati dei conti e statistiche
+- Flusso dati:
+  - Combina `MovimentiService.getMovimenti$()` con `ContiService.getConti$()` tramite `combineLatest`
+  - Calcola totali per valuta e per conto
+- File: `src/app/lista-movimenti/lista-movimenti.component.ts` / `.html` / `.css`
 
-## Running unit tests
+### Form Movimento
+- Scopo: creazione/modifica movimento; supporta pagamenti rateizzati
+- Funzioni chiave:
+  - Toggle "Pagamento rateizzato"
+  - Validazione numero rate
+  - Calcolo del totale rate
+  - Controllo liquidità e apertura pop-up rosso se insufficiente
+  - Creazione rate con `MovimentiService.createInstallmentPayments`
+- File: `src/app/form-movimento/form-movimento.component.ts` / `.html` / `.css`
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+### Conti Contabili
+- Scopo: gestione piano dei conti (in memoria) con filtro e form modale
+- Flusso:
+  - Lettura stream da `ContiContabiliService`
+  - Filtro per testo e tipo
+  - Form modale per create/update
+- File: `src/app/conti-contabili/conti-contabili.component.ts` / `.html` / `.css`
+- Tabella figlia: `src/app/conti-contabili/tabella-conti/tabella-conti.component.ts` / `.html` / `.css`
 
-## Running end-to-end tests
+## Servizi
+### ContiService
+- Ruolo: CRUD conti via HTTP verso backend C#
+- Metodi principali: `getConti$`, `getContoById`, `upsertConto`
+- File: `src/app/service/conti-service.ts`
 
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
+### MovimentiService
+- Ruolo: CRUD movimenti in memoria, statistiche e rateizzazione
+- Metodi principali:
+  - `getMovimenti$`, `getById`, `upsert`, `delete`
+  - `getBalanceForAccount(accountId)` per saldo stimato
+  - `createInstallmentPayments(params)` per generare rate mensili
+- File: `src/app/service/movimenti-service.ts`
 
-## Further help
+### ContiContabiliService
+- Ruolo: gestione conti contabili in memoria con BehaviorSubject
+- Metodi: `getContiContabili$`, `createConto`, `updateConto`, `deleteConto`
+- File: `src/app/service/conti-contabili.service.ts`
 
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+## Modelli
+- BankAccount: `id`, `name`, `iban`, `currency`
+- BankMovement: `id`, `accountId`, `date`, `description`, `currency`, `amount`, opzionali `direction`, `category`, `balanceAfter`, `createdAt`
+- ContiContabili: `id`, `nome`, `code`, `description`, `type`
+- File: `src/app/model/*.ts`
+
+## Flussi principali
+### Creazione conto
+1. Naviga in `form-conto-bancario`
+2. Compila form e salva
+3. Il service effettua `POST` o `PUT` al backend e aggiorna la lista
+
+### Creazione movimento
+1. Naviga in `form-movimento`
+2. Compila form
+3. Se non rateizzato: `MovimentiService.upsert` inserisce il singolo movimento
+4. Se rateizzato:
+   - Verifica saldo con `getBalanceForAccount`
+   - Se insufficiente: mostra pop-up rosso con dettagli
+   - Se sufficiente: genera le rate con `createInstallmentPayments` e naviga alla lista
+
+### Lista movimenti e statistiche
+1. Combina movimenti e conti per mostrare nome e IBAN
+2. Calcola totali per valuta e per conto
+
+### Conti contabili
+1. Applica filtri e mostra tabella
+2. Apre form modale per create/update
+
+## Stili
+- Design system in `src/styles.css` con palette, pulsanti, card, tabelle, alerts
+- Stili locali per pop-up modale del form movimento in `form-movimento.component.css`
+
+## Backend API (C#)
+- Base URL: `http://localhost:5051`
+- Endpoints:
+  - `GET /api/conti` elenco conti
+  - `GET /api/conti/{id}` dettaglio conto
+  - `POST /api/conti` crea conto
+  - `PUT /api/conti/{id}` aggiorna conto
+  - `DELETE /api/conti/{id}` elimina conto
+- Dati iniziali in memoria in `BankApi/Program.cs`
+
+## Note SQL Server
+- Tabelle suggerite: `dbo.BankAccounts`, `dbo.BankMovements`, `dbo.ContiContabili`
+- Vedi query di creazione fornite nella richiesta precedente per gli schemi consigliati

@@ -1,5 +1,42 @@
 # Bank Movements Manager - Esercizio Angular
 
+## Guida Funzionale (passo passo)
+
+### 1) Avvio applicazione
+- Avvia il backend in memoria: esegui `dotnet run` nella cartella `BankApi`
+- Avvia il frontend: esegui `npm start` nella cartella `bank-movement-manager`
+- Apri `http://localhost:4200/`
+
+### 2) Dashboard (Home)
+- Usa le card per navigare a: Conti Bancari, Movimenti, Nuovo Conto, Nuovo Movimento, Conti Contabili
+
+### 3) Conti Bancari
+- **Lista Conti Bancari**: visualizza la tabella, elimina o modifica un conto
+- **Form Conto Bancario**:
+  1. Inserisci Nome, IBAN e Valuta
+  2. Salva per creare o modificare (in base alla rotta con o senza `:id`)
+  3. Torna alla lista
+
+### 4) Movimenti
+- **Lista Movimenti**:
+  1. Visualizza movimenti con Nome conto e IBAN
+  2. Controlla i totali per valuta e per conto
+  3. Modifica o elimina singoli movimenti
+- **Form Movimento**:
+  1. Inserisci Conto, Data, Descrizione, Valuta, Importo
+  2. Se attivi “Pagamento rateizzato”, imposta il numero rate
+  3. Il sistema controlla il saldo: se insufficiente mostra un pop-up rosso
+  4. Se sufficiente, crea le rate e torna alla lista
+
+### 5) Conti Contabili
+- Filtra per testo e tipo
+- Crea/modifica tramite form modale
+- Elimina i conti contabili dalla tabella
+
+### 6) Dati in memoria (backend e frontend)
+- Backend C#: conti bancari in memoria con API `/api/conti`
+- Frontend Angular: movimenti e conti contabili gestiti in memoria
+
 ## Prerequisiti
 
 - Aver completato il [Tour of Heroes](https://angular.io/tutorial/tour-of-heroes) di Angular
