@@ -6,6 +6,8 @@ import { ListaMovimentiComponent } from './lista-movimenti/lista-movimenti.compo
 import { FormContoBancarioComponent } from './form-conto-bancario/form-conto-bancario.component';
 import { FormMovimentoComponent } from './form-movimento/form-movimento.component';
 import { ContiContabiliComponent } from './conti-contabili/conti-contabili.component';
+import { LoginComponent } from './login/login.component';
+import { AuthGuard } from './auth/auth.guard';
 
 /**
  * =========================================================================================
@@ -20,18 +22,19 @@ const routes: Routes = [
   // Dashboard principale
   { path: 'home', component: HomeComponent },
   // Elenco dei conti bancari
-  { path: 'lista-conti-bancari', component: ListaContiBancariComponent },
+  { path: 'lista-conti-bancari', component: ListaContiBancariComponent, canActivate: [AuthGuard] },
   // Elenco e statistiche dei movimenti
-  { path: 'lista-movimenti', component: ListaMovimentiComponent },
+  { path: 'lista-movimenti', component: ListaMovimentiComponent, canActivate: [AuthGuard] },
   
   // Form conto: creazione e modifica
-  { path: 'form-conto-bancario', component: FormContoBancarioComponent },
-  { path: 'form-conto-bancario/:id', component: FormContoBancarioComponent },
+  { path: 'form-conto-bancario', component: FormContoBancarioComponent, canActivate: [AuthGuard] },
+  { path: 'form-conto-bancario/:id', component: FormContoBancarioComponent, canActivate: [AuthGuard] },
   
   // Form movimenti: creazione e modifica
-  { path: 'form-movimento', component: FormMovimentoComponent },
+  { path: 'form-movimento', component: FormMovimentoComponent, canActivate: [AuthGuard] },
   // Piano dei conti contabili
-  { path: 'conti-contabili', component: ContiContabiliComponent },
+  { path: 'conti-contabili', component: ContiContabiliComponent, canActivate: [AuthGuard] },
+  { path: 'login', component: LoginComponent },
   // Rotta wildcard: qualsiasi URL sconosciuto torna alla home
   { path: '**', redirectTo: '/home' },
 ];

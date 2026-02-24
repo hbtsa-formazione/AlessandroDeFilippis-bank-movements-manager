@@ -1,0 +1,9 @@
+.login-card {
+  max-width: 420px;
+  margin: 40px auto;
+}
+
+.error {
+  margin-top: 12px;
+  color: var(--danger);
+}

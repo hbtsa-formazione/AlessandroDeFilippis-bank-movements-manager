@@ -12,8 +12,8 @@
     <a routerLink="/home" routerLinkActive="active">Dashboard</a>
     <a routerLink="/lista-conti-bancari" routerLinkActive="active">Conti</a>
     <a routerLink="/lista-movimenti" routerLinkActive="active">Movimenti</a>
-    <!-- Esempio di interpolazione dati dal componente -->
-    {{myVariable}}
+    <a routerLink="/login" routerLinkActive="active" *ngIf="(user$ | async) === null">Login</a>
+    <button class="btn btn-secondary btn-sm" *ngIf="(user$ | async) !== null" (click)="logout()">Logout</button>
   </div>
 </nav>
 

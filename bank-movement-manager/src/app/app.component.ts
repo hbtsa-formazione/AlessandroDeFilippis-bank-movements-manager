@@ -1,4 +1,6 @@
 import { Component } from '@angular/core';
+import { Observable } from 'rxjs';
+import { AuthService, AuthUser } from './auth/auth.service';
 
 /**
  * =========================================================================================
@@ -15,5 +17,14 @@ import { Component } from '@angular/core';
 })
 export class AppComponent {
   title = 'bank-movement-manager';
-  myVariable = 'pippo';
+  user$: Observable<AuthUser | null>;
+
+  constructor(private auth: AuthService) {
+    this.user$ = this.auth.user$();
+  }
+
+  // Invoca il logout e pulisce la sessione client
+  logout(): void {
+    this.auth.logout().subscribe();
+  }
 }

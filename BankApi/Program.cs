@@ -6,7 +6,13 @@
 // ==============================================================================================
 
 // Importiamo il "Builder" che serve a costruire l'applicazione web.
-using System.Security.Authentication;
+using System.Collections.Concurrent;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,6 +36,96 @@ builder.Services.AddCors(options =>
         });
 });
 
+// ==============================================================================================
+// 1.b CONFIGURAZIONE JWT (AUTENTICAZIONE E AUTORIZZAZIONE)
+// ==============================================================================================
+// Leggiamo le impostazioni JWT (Issuer, Audience, scadenze) dal file di configurazione.
+// La chiave di firma (Secret) deve essere fornita via variabile d'ambiente in produzione.
+// In sviluppo, se manca, ne generiamo una temporanea per poter avviare il progetto.
+var jwtSection = builder.Configuration.GetSection("Jwt");
+var issuer = jwtSection["Issuer"] ?? "BankApi";
+var audience = jwtSection["Audience"] ?? "BankApiClient";
+var accessTokenMinutes = int.TryParse(jwtSection["AccessTokenMinutes"], out var atm) ? atm : 15;
+var refreshTokenDays = int.TryParse(jwtSection["RefreshTokenDays"], out var rtd) ? rtd : 7;
+var secret = builder.Configuration["Jwt:Secret"] ?? Environment.GetEnvironmentVariable("JWT_SECRET");
+if (string.IsNullOrWhiteSpace(secret))
+{
+    if (builder.Environment.IsDevelopment())
+    {
+        secret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+    }
+    else
+    {
+        throw new InvalidOperationException("JWT secret is required.");
+    }
+}
+
+var jwtOptions = new JwtOptions(issuer, audience, secret, TimeSpan.FromMinutes(accessTokenMinutes), TimeSpan.FromDays(refreshTokenDays));
+builder.Services.AddSingleton(jwtOptions);
+builder.Services.AddSingleton<JwtTokenService>();
+
+// Database in memoria per token revocati e refresh token attivi
+var revokedTokens = new ConcurrentDictionary<string, DateTimeOffset>();
+var refreshTokens = new ConcurrentDictionary<string, RefreshTokenEntry>();
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtOptions.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwtOptions.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Secret)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30)
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            // Verifica della blacklist: se il JTI è revocato, il token è rifiutato
+            OnTokenValidated = context =>
+            {
+                var jti = context.Principal?.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+                if (!string.IsNullOrWhiteSpace(jti) && revokedTokens.TryGetValue(jti, out var expiresAt))
+                {
+                    if (expiresAt > DateTimeOffset.UtcNow)
+                    {
+                        context.Fail("revoked");
+                    }
+                    else
+                    {
+                        revokedTokens.TryRemove(jti, out _);
+                    }
+                }
+                return Task.CompletedTask;
+            },
+            // Gestione errori generici di autenticazione
+            OnAuthenticationFailed = context =>
+            {
+                return Task.CompletedTask;
+            },
+            // Risposte coerenti per token mancante, scaduto o non valido
+            OnChallenge = context =>
+            {
+                context.HandleResponse();
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                context.Response.ContentType = "application/json";
+                var hasAuth = context.Request.Headers.ContainsKey("Authorization");
+                var isExpired = context.AuthenticateFailure is SecurityTokenExpiredException;
+                var message = !hasAuth ? "Token mancante" : isExpired ? "Token scaduto" : "Token non valido";
+                return context.Response.WriteAsJsonAsync(new { message });
+            }
+        };
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+});
+
 // Costruiamo l'applicazione vera e propria.
 var app = builder.Build();
 
@@ -41,6 +137,9 @@ var app = builder.Build();
 // Attiviamo la politica CORS che abbiamo definito sopra.
 // Deve essere messo PRIMA di definire gli endpoint.
 app.UseCors("AllowAngular");
+// Middleware di autenticazione e autorizzazione
+app.UseAuthentication();
+app.UseAuthorization();
 
 // ==============================================================================================
 // 3. DATABASE (IN MEMORIA)
@@ -72,6 +171,110 @@ var conti = new List<ContoBancario>
 // ==============================================================================================
 // Qui mappiamo gli URL (es. /api/conti) alle funzioni che devono rispondere.
 
+// Utenti demo con password hashate (PBKDF2)
+var users = new List<AuthUser>
+{
+    new() { Id = 1, Username = "admin", PasswordHash = PasswordHasher.Hash("Admin123!"), Role = "Admin" },
+    new() { Id = 2, Username = "user", PasswordHash = PasswordHasher.Hash("User123!"), Role = "User" }
+};
+
+// AUTH: Login con rilascio di Access e Refresh Token
+app.MapPost("/api/auth/login", (LoginRequest req, JwtTokenService tokenService) =>
+{
+    var user = users.FirstOrDefault(u => u.Username == req.Username);
+    if (user is null)
+    {
+        return Results.Unauthorized();
+    }
+    if (!PasswordHasher.Verify(req.Password, user.PasswordHash))
+    {
+        return Results.Unauthorized();
+    }
+
+    var tokens = tokenService.CreateTokens(user);
+    var entry = new RefreshTokenEntry
+    {
+        UserId = user.Id,
+        Token = tokens.RefreshToken,
+        ExpiresAt = tokens.RefreshTokenExpiresAt,
+        IsRevoked = false
+    };
+    refreshTokens[tokens.RefreshToken] = entry;
+    return Results.Ok(new
+    {
+        accessToken = tokens.AccessToken,
+        accessTokenExpiresAt = tokens.AccessTokenExpiresAt,
+        refreshToken = tokens.RefreshToken,
+        refreshTokenExpiresAt = tokens.RefreshTokenExpiresAt,
+        user = new { id = user.Id, username = user.Username, role = user.Role }
+    });
+});
+
+// AUTH: Refresh (token rotation single-use)
+app.MapPost("/api/auth/refresh", (RefreshRequest req, JwtTokenService tokenService) =>
+{
+    if (!refreshTokens.TryGetValue(req.RefreshToken, out var entry) || entry.IsRevoked || entry.ExpiresAt <= DateTimeOffset.UtcNow)
+    {
+        return Results.Unauthorized();
+    }
+
+    var user = users.FirstOrDefault(u => u.Id == entry.UserId);
+    if (user is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var tokens = tokenService.CreateTokens(user);
+    refreshTokens[tokens.RefreshToken] = new RefreshTokenEntry
+    {
+        UserId = user.Id,
+        Token = tokens.RefreshToken,
+        ExpiresAt = tokens.RefreshTokenExpiresAt,
+        IsRevoked = false
+    };
+
+    entry.IsRevoked = true;
+    refreshTokens[req.RefreshToken] = entry;
+
+    return Results.Ok(new
+    {
+        accessToken = tokens.AccessToken,
+        accessTokenExpiresAt = tokens.AccessTokenExpiresAt,
+        refreshToken = tokens.RefreshToken,
+        refreshTokenExpiresAt = tokens.RefreshTokenExpiresAt
+    });
+});
+
+// AUTH: Logout con revoca access token e invalidazione refresh token
+app.MapPost("/api/auth/logout", (HttpContext context, LogoutRequest req, JwtTokenService tokenService) =>
+{
+    var authHeader = context.Request.Headers.Authorization.ToString();
+    if (authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+    {
+        var token = authHeader["Bearer ".Length..].Trim();
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            var jwt = tokenService.ReadToken(token);
+            var expiresAt = jwt.ValidTo == default
+                ? DateTimeOffset.UtcNow.AddMinutes(accessTokenMinutes)
+                : new DateTimeOffset(DateTime.SpecifyKind(jwt.ValidTo, DateTimeKind.Utc));
+            if (!string.IsNullOrWhiteSpace(jwt.Id))
+            {
+                revokedTokens[jwt.Id] = expiresAt;
+            }
+        }
+    }
+    if (!string.IsNullOrWhiteSpace(req.RefreshToken))
+    {
+        if (refreshTokens.TryGetValue(req.RefreshToken, out var entry))
+        {
+            entry.IsRevoked = true;
+            refreshTokens[req.RefreshToken] = entry;
+        }
+    }
+    return Results.Ok();
+}).RequireAuthorization();
+
 // ----------------------------------------------------------------------------------------------
 // GET: /api/conti
 // Restituisce la lista di tutti i conti.
@@ -80,7 +283,7 @@ app.MapGet("/api/conti", () =>
 {
     // Restituisce direttamente la lista. .NET la converte automaticamente in JSON.
     return Results.Ok(conti);
-});
+}).RequireAuthorization();
 
 // ----------------------------------------------------------------------------------------------
 // GET: /api/conti/{id}
@@ -99,7 +302,7 @@ app.MapGet("/api/conti/{id}", (int id) =>
 
     // Se lo troviamo, restituiamo 200 OK con l'oggetto.
     return Results.Ok(conto);
-});
+}).RequireAuthorization();
 
 // ----------------------------------------------------------------------------------------------
 // POST: /api/conti
@@ -117,7 +320,7 @@ app.MapPost("/api/conti", (ContoBancario nuovoConto) =>
 
     // Restituiamo 200 OK con il conto appena creato (che ora ha l'ID).
     return Results.Ok(nuovoConto);
-});
+}).RequireAuthorization("AdminOnly");
 
 // ----------------------------------------------------------------------------------------------
 // PUT: /api/conti/{id}
@@ -141,7 +344,7 @@ app.MapPut("/api/conti/{id}", (int id, ContoBancario contoAggiornato) =>
 
     // Restituiamo il conto aggiornato.
     return Results.Ok(contoEsistente);
-});
+}).RequireAuthorization("AdminOnly");
 
 // ----------------------------------------------------------------------------------------------
 // DELETE: /api/conti/{id}
@@ -160,7 +363,7 @@ app.MapDelete("/api/conti/{id}", (int id) =>
 
     // Restituiamo 200 OK (anche se non c'era, per idempotenza spesso si fa così, oppure 204 No Content).
     return Results.Ok();
-});
+}).RequireAuthorization("AdminOnly");
 
 // ==============================================================================================
 // 5. AVVIO DELL'APPLICAZIONE
@@ -179,4 +382,67 @@ public class ContoBancario
     public string Name { get; set; } = string.Empty; // Inizializziamo a stringa vuota per evitare null
     public string Iban { get; set; } = string.Empty;
     public string Currency { get; set; } = "EUR";
+}
+
+// ==============================================================================================
+// MODELLI AUTENTICAZIONE
+// ==============================================================================================
+public class AuthUser
+{
+    public int Id { get; set; }
+    public string Username { get; set; } = string.Empty;
+    public string PasswordHash { get; set; } = string.Empty;
+    public string Role { get; set; } = "User";
+}
+
+public class LoginRequest
+{
+    public string Username { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+}
+
+public class RefreshRequest
+{
+    public string RefreshToken { get; set; } = string.Empty;
+}
+
+public class LogoutRequest
+{
+    public string? RefreshToken { get; set; }
+}
+
+public class RefreshTokenEntry
+{
+    public int UserId { get; set; }
+    public string Token { get; set; } = string.Empty;
+    public DateTimeOffset ExpiresAt { get; set; }
+    public bool IsRevoked { get; set; }
+}
+
+// ==============================================================================================
+// UTILITÀ: HASH DELLA PASSWORD
+// ==============================================================================================
+public static class PasswordHasher
+{
+    public static string Hash(string password)
+    {
+        var salt = RandomNumberGenerator.GetBytes(16);
+        using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 100000, HashAlgorithmName.SHA256);
+        var hash = pbkdf2.GetBytes(32);
+        return $"{Convert.ToBase64String(salt)}.{Convert.ToBase64String(hash)}";
+    }
+
+    public static bool Verify(string password, string stored)
+    {
+        var parts = stored.Split('.');
+        if (parts.Length != 2)
+        {
+            return false;
+        }
+        var salt = Convert.FromBase64String(parts[0]);
+        var expected = Convert.FromBase64String(parts[1]);
+        using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 100000, HashAlgorithmName.SHA256);
+        var actual = pbkdf2.GetBytes(32);
+        return CryptographicOperations.FixedTimeEquals(actual, expected);
+    }
 }
