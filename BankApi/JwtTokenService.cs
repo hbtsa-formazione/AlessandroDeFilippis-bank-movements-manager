@@ -13,10 +13,14 @@ using Microsoft.IdentityModel.Tokens;
 // - Leggere un token JWT per estrarne metadati (es. JTI, scadenza)
 public sealed class JwtTokenService
 {
+    // Configurazione JWT (issuer, audience, segreto e scadenze)
     private readonly JwtOptions _options;
+    // Handler nativo per creare e leggere token JWT
     private readonly JwtSecurityTokenHandler _handler = new();
+    // Chiave simmetrica (byte[]) derivata dal segreto
     private readonly byte[] _key;
 
+    // Costruttore: inizializza opzioni e chiave di firma
     public JwtTokenService(JwtOptions options)
     {
         _options = options;
@@ -24,10 +28,18 @@ public sealed class JwtTokenService
     }
 
     // Crea una coppia di token (Access + Refresh) per un utente autenticato
+    // Parametri:
+    // - user: utente autenticato con ID e ruolo
+    // Ritorno:
+    // - TokenResult contenente access token, refresh token e scadenze
+    // Eccezioni:
+    // - Nessuna eccezione specifica gestita qui; eventuali errori di runtime sono propagati.
     public TokenResult CreateTokens(AuthUser user)
     {
         var now = DateTimeOffset.UtcNow;
+        // JTI: identificatore univoco del token per gestire revoche e blacklist
         var jti = Guid.NewGuid().ToString("N");
+        // Claim minimi richiesti: sub (ID utente), role, iat (timestamp), jti
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
@@ -36,7 +48,9 @@ public sealed class JwtTokenService
             new(JwtRegisteredClaimNames.Jti, jti)
         };
 
+        // Calcolo scadenza access token
         var expiresAt = now.Add(_options.AccessTokenLifetime);
+        // Creazione JWT firmato con HMAC-SHA256 e chiave simmetrica
         var token = new JwtSecurityToken(
             _options.Issuer,
             _options.Audience,
@@ -46,13 +60,18 @@ public sealed class JwtTokenService
             signingCredentials: new SigningCredentials(new SymmetricSecurityKey(_key), SecurityAlgorithms.HmacSha256)
         );
 
+        // Serializzazione in stringa compatta "eyJ..."
         var accessToken = _handler.WriteToken(token);
+        // Refresh token casuale per mantenere la sessione senza nuovo login
         var refreshToken = CreateRefreshToken();
+        // Scadenza del refresh token
         var refreshExpiresAt = now.Add(_options.RefreshTokenLifetime);
         return new TokenResult(accessToken, expiresAt, refreshToken, refreshExpiresAt, jti);
     }
 
     // Genera un refresh token casuale e non prevedibile
+    // Ritorno:
+    // - stringa Base64 di 64 byte casuali
     public string CreateRefreshToken()
     {
         var bytes = RandomNumberGenerator.GetBytes(64);
@@ -60,6 +79,10 @@ public sealed class JwtTokenService
     }
 
     // Legge e decodifica un JWT (senza validazione)
+    // Parametri:
+    // - token: stringa JWT
+    // Ritorno:
+    // - JwtSecurityToken con header, payload e claims
     public JwtSecurityToken ReadToken(string token)
     {
         return _handler.ReadJwtToken(token);
@@ -71,10 +94,15 @@ public sealed class JwtTokenService
 // ==============================================================================================
 // Parametri centralizzati per la generazione e validazione dei token
 public record JwtOptions(
+    // Emittente del token
     string Issuer,
+    // Destinatario previsto
     string Audience,
+    // Segreto di firma
     string Secret,
+    // Durata access token
     TimeSpan AccessTokenLifetime,
+    // Durata refresh token
     TimeSpan RefreshTokenLifetime
 );
 
@@ -82,9 +110,14 @@ public record JwtOptions(
 // DTO: RISULTATO GENERAZIONE TOKEN
 // ==============================================================================================
 public record TokenResult(
+    // JWT firmato per l'accesso
     string AccessToken,
+    // Scadenza access token (UTC)
     DateTimeOffset AccessTokenExpiresAt,
+    // Token lungo per refresh
     string RefreshToken,
+    // Scadenza refresh token (UTC)
     DateTimeOffset RefreshTokenExpiresAt,
+    // JTI del token per revoca/blacklist
     string Jti
 );

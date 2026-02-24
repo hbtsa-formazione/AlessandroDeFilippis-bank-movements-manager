@@ -8,6 +8,10 @@ import { AuthService } from './auth.service';
  * INTERCEPTOR: AUTH INTERCEPTOR
  * =========================================================================================
  * Aggiunge il Bearer Token alle richieste HTTP e tenta il refresh automatico su 401.
+ * Flusso di esecuzione:
+ * 1) Intercetta la richiesta e aggiunge Authorization se presente un access token.
+ * 2) Se la risposta è 401 e non è una chiamata /auth, tenta il refresh.
+ * 3) Se il refresh riesce, ripete la richiesta originale con il nuovo token.
  */
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
@@ -19,6 +23,11 @@ export class AuthInterceptor implements HttpInterceptor {
   constructor(private auth: AuthService) {}
 
   // Intercetta tutte le richieste HTTP
+  // Parametri:
+  // - req: richiesta originale
+  // - next: handler successivo nella pipeline
+  // Ritorno:
+  // - Observable con l'evento HTTP (successo o errore)
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     const token = this.auth.getAccessToken();
     const isAuthCall = req.url.includes('/api/auth/');
@@ -34,6 +43,13 @@ export class AuthInterceptor implements HttpInterceptor {
   }
 
   // Gestione 401: prova a refreshare il token e ripete la richiesta fallita
+  // Parametri:
+  // - req: richiesta originale (senza token o con token scaduto)
+  // - next: handler successivo
+  // Ritorno:
+  // - Observable della richiesta ripetuta (o della richiesta originale se refresh fallisce)
+  // Errori gestiti:
+  // - se il refresh fallisce, l'errore viene propagato al chiamante
   private handle401(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     if (this.isRefreshing) {
       return this.refreshSubject.pipe(

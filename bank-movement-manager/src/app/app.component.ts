@@ -16,14 +16,18 @@ import { AuthService, AuthUser } from './auth/auth.service';
   styleUrls: ['./app.component.css']
 })
 export class AppComponent {
+  // Titolo dell'app, usato in componenti o test
   title = 'bank-movement-manager';
+  // Stream dell'utente loggato per mostrare Login/Logout nella navbar
   user$: Observable<AuthUser | null>;
 
   constructor(private auth: AuthService) {
+    // Ci sottoscriviamo allo stream per aggiornare la UI in tempo reale
     this.user$ = this.auth.user$();
   }
 
   // Invoca il logout e pulisce la sessione client
+  // Ritorno: void (l'Observable è gestito internamente con subscribe)
   logout(): void {
     this.auth.logout().subscribe();
   }
