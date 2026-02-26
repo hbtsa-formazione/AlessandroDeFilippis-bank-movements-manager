@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
+using BankApi.Data;
 using Xunit;
 
 public class JwtTokenServiceTests
@@ -16,9 +17,9 @@ public class JwtTokenServiceTests
             RefreshTokenLifetime: TimeSpan.FromDays(1)
         );
         var service = new JwtTokenService(options);
-        var user = new AuthUser { Id = 42, Username = "alice", Role = "Admin", PasswordHash = "x" };
+        var user = new AuthUser { Id = 42, Username = "alice", PasswordHash = "x" };
 
-        var result = service.CreateTokens(user);
+        var result = service.CreateTokens(user, new[] { "Admin" });
 
         Assert.False(string.IsNullOrWhiteSpace(result.AccessToken));
         var handler = new JwtSecurityTokenHandler();

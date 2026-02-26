@@ -6,12 +6,14 @@
 // ==============================================================================================
 
 // Importiamo il "Builder" che serve a costruire l'applicazione web.
-using System.Collections.Concurrent;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Globalization;
+using BankApi.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -81,10 +83,8 @@ builder.Services.AddSingleton(jwtOptions);
 // Registriamo il servizio che genera e legge i token
 builder.Services.AddSingleton<JwtTokenService>();
 
-// Database in memoria per token revocati e refresh token attivi
-// Nota: in produzione questi store andrebbero su DB o cache condivisa (Redis).
-var revokedTokens = new ConcurrentDictionary<string, DateTimeOffset>();
-var refreshTokens = new ConcurrentDictionary<string, RefreshTokenEntry>();
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DbEsempio")));
 
 // Configurazione middleware JWT Bearer per validare i token nelle richieste HTTP
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -107,24 +107,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.Events = new JwtBearerEvents
         {
             // Verifica della blacklist: se il JTI è revocato, il token è rifiutato
-            OnTokenValidated = context =>
+            OnTokenValidated = async context =>
             {
-                // JTI (JWT ID) è un identificatore univoco del token
                 var jti = context.Principal?.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
-                if (!string.IsNullOrWhiteSpace(jti) && revokedTokens.TryGetValue(jti, out var expiresAt))
+                if (!string.IsNullOrWhiteSpace(jti))
                 {
-                    if (expiresAt > DateTimeOffset.UtcNow)
+                    var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                    var entry = await db.AccessTokenBlacklists.AsNoTracking()
+                        .FirstOrDefaultAsync(x => x.Jti == jti);
+                    if (entry != null && entry.ExpiresAt > DateTimeOffset.UtcNow)
                     {
-                        // Token revocato e ancora "valido" temporalmente -> accesso negato
                         context.Fail("revoked");
                     }
-                    else
-                    {
-                        // Token scaduto: possiamo pulire la blacklist
-                        revokedTokens.TryRemove(jti, out _);
-                    }
                 }
-                return Task.CompletedTask;
             },
             // Gestione errori generici di autenticazione
             OnAuthenticationFailed = context =>
@@ -170,42 +165,16 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // ==============================================================================================
-// 3. DATABASE (IN MEMORIA)
-// ==============================================================================================
-// Non usiamo ancora un database vero (SQL). Usiamo una semplice lista in memoria.
-// ATTENZIONE: Se riavvii il server, i dati si resettano!
-
-// Creiamo una lista statica di Conti Bancari per avere dei dati di prova.
-var conti = new List<ContoBancario>
-{
-    new ContoBancario 
-    { 
-        Id = 1, 
-        Name = "Conto Principale", 
-        Iban = "IT60X0542811101000000123456", 
-        Currency = "EUR" 
-    },
-    new ContoBancario 
-    { 
-        Id = 2, 
-        Name = "Conto Risparmio", 
-        Iban = "IT12A0123456789012345678901", 
-        Currency = "USD" 
-    }
-};
-
-// ==============================================================================================
 // 4. DEFINIZIONE DEGLI ENDPOINT (API)
 // ==============================================================================================
 // Qui mappiamo gli URL (es. /api/conti) alle funzioni che devono rispondere.
 
-// Utenti demo con password hashate (PBKDF2)
-// Nota: in un'implementazione reale, questi dati arriverebbero da DB.
-var users = new List<AuthUser>
+using (var scope = app.Services.CreateScope())
 {
-    new() { Id = 1, Username = "admin", PasswordHash = PasswordHasher.Hash("Admin123!"), Role = "Admin" },
-    new() { Id = 2, Username = "user", PasswordHash = PasswordHasher.Hash("User123!"), Role = "User" }
-};
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.EnsureCreated();
+    SeedData(db);
+}
 
 // AUTH: Login con rilascio di Access e Refresh Token
 // Parametri:
@@ -214,39 +183,47 @@ var users = new List<AuthUser>
 // Ritorno:
 // - 200 OK con token e dati utente se le credenziali sono valide
 // - 401 Unauthorized se username o password non corrispondono
-app.MapPost("/api/auth/login", (LoginRequest req, JwtTokenService tokenService) =>
+app.MapPost("/api/auth/login", async (LoginRequest req, JwtTokenService tokenService, AppDbContext db) =>
 {
-    // Cerchiamo l'utente in memoria per username
-    var user = users.FirstOrDefault(u => u.Username == req.Username);
+    var user = await db.Users.FirstOrDefaultAsync(u => u.Username == req.Username && u.IsActive);
     if (user is null)
     {
         return Results.Unauthorized();
     }
-    // Verifichiamo la password con hash PBKDF2
     if (!PasswordHasher.Verify(req.Password, user.PasswordHash))
     {
         return Results.Unauthorized();
     }
 
-    // Generiamo access e refresh token
-    var tokens = tokenService.CreateTokens(user);
-    // Salviamo il refresh token per poterlo riutilizzare in fase di refresh
-    var entry = new RefreshTokenEntry
+    var roles = await db.UserRoles
+        .Include(ur => ur.Role)
+        .Where(ur => ur.UserId == user.Id)
+        .Select(ur => ur.Role!.Name)
+        .ToListAsync();
+    if (roles.Count == 0)
+    {
+        roles.Add("User");
+    }
+
+    var tokens = tokenService.CreateTokens(user, roles);
+    var entry = new RefreshToken
     {
         UserId = user.Id,
-        Token = tokens.RefreshToken,
+        TokenHash = HashToken(tokens.RefreshToken),
         ExpiresAt = tokens.RefreshTokenExpiresAt,
-        IsRevoked = false
+        IsRevoked = false,
+        CreatedAt = DateTimeOffset.UtcNow
     };
-    refreshTokens[tokens.RefreshToken] = entry;
-    // Restituiamo token e profilo utente al frontend
+    db.RefreshTokens.Add(entry);
+    await db.SaveChangesAsync();
+
     return Results.Ok(new
     {
         accessToken = tokens.AccessToken,
         accessTokenExpiresAt = tokens.AccessTokenExpiresAt,
         refreshToken = tokens.RefreshToken,
         refreshTokenExpiresAt = tokens.RefreshTokenExpiresAt,
-        user = new { id = user.Id, username = user.Username, role = user.Role }
+        user = new { id = user.Id, username = user.Username, role = roles[0] }
     });
 });
 
@@ -256,37 +233,53 @@ app.MapPost("/api/auth/login", (LoginRequest req, JwtTokenService tokenService) 
 // Ritorno:
 // - 200 OK con nuova coppia di token se valido e non revocato
 // - 401 Unauthorized se mancante, revocato o scaduto
-app.MapPost("/api/auth/refresh", (RefreshRequest req, JwtTokenService tokenService) =>
+app.MapPost("/api/auth/refresh", async (RefreshRequest req, JwtTokenService tokenService, AppDbContext db) =>
 {
-    // Verifichiamo che il refresh token esista, non sia revocato e non sia scaduto
-    if (!refreshTokens.TryGetValue(req.RefreshToken, out var entry) || entry.IsRevoked || entry.ExpiresAt <= DateTimeOffset.UtcNow)
+    if (string.IsNullOrWhiteSpace(req.RefreshToken))
     {
         return Results.Unauthorized();
     }
 
-    // Recuperiamo l'utente collegato al refresh token
-    var user = users.FirstOrDefault(u => u.Id == entry.UserId);
-    if (user is null)
+    var tokenHash = HashToken(req.RefreshToken);
+    var entry = await db.RefreshTokens
+        .Include(r => r.User)
+        .FirstOrDefaultAsync(r => r.TokenHash == tokenHash);
+    if (entry is null || entry.IsRevoked || entry.ExpiresAt <= DateTimeOffset.UtcNow)
     {
         return Results.Unauthorized();
     }
 
-    // Generiamo una nuova coppia di token
-    var tokens = tokenService.CreateTokens(user);
-    // Registriamo il nuovo refresh token
-    refreshTokens[tokens.RefreshToken] = new RefreshTokenEntry
+    var user = entry.User;
+    if (user is null || !user.IsActive)
+    {
+        return Results.Unauthorized();
+    }
+
+    var roles = await db.UserRoles
+        .Include(ur => ur.Role)
+        .Where(ur => ur.UserId == user.Id)
+        .Select(ur => ur.Role!.Name)
+        .ToListAsync();
+    if (roles.Count == 0)
+    {
+        roles.Add("User");
+    }
+
+    var tokens = tokenService.CreateTokens(user, roles);
+    var newRefresh = new RefreshToken
     {
         UserId = user.Id,
-        Token = tokens.RefreshToken,
+        TokenHash = HashToken(tokens.RefreshToken),
         ExpiresAt = tokens.RefreshTokenExpiresAt,
-        IsRevoked = false
+        IsRevoked = false,
+        CreatedAt = DateTimeOffset.UtcNow
     };
-
-    // Invalidiamo il vecchio refresh token per garantire single-use
+    db.RefreshTokens.Add(newRefresh);
     entry.IsRevoked = true;
-    refreshTokens[req.RefreshToken] = entry;
+    entry.RevokedAt = DateTimeOffset.UtcNow;
+    entry.ReplacedByToken = newRefresh;
+    await db.SaveChangesAsync();
 
-    // Restituiamo la nuova coppia di token
     return Results.Ok(new
     {
         accessToken = tokens.AccessToken,
@@ -302,36 +295,45 @@ app.MapPost("/api/auth/refresh", (RefreshRequest req, JwtTokenService tokenServi
 // - req.RefreshToken: refresh token da revocare (body)
 // Ritorno:
 // - 200 OK sempre (operazione idempotente)
-app.MapPost("/api/auth/logout", (HttpContext context, LogoutRequest req, JwtTokenService tokenService) =>
+app.MapPost("/api/auth/logout", async (HttpContext context, LogoutRequest req, JwtTokenService tokenService, AppDbContext db) =>
 {
-    // Recuperiamo il token dall'header Authorization
     var authHeader = context.Request.Headers.Authorization.ToString();
     if (authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
     {
         var token = authHeader["Bearer ".Length..].Trim();
         if (!string.IsNullOrWhiteSpace(token))
         {
-            // Decodifichiamo il JWT per estrarre JTI e data di scadenza
             var jwt = tokenService.ReadToken(token);
             var expiresAt = jwt.ValidTo == default
                 ? DateTimeOffset.UtcNow.AddMinutes(accessTokenMinutes)
                 : new DateTimeOffset(DateTime.SpecifyKind(jwt.ValidTo, DateTimeKind.Utc));
             if (!string.IsNullOrWhiteSpace(jwt.Id))
             {
-                // Inseriamo l'access token in blacklist fino alla scadenza
-                revokedTokens[jwt.Id] = expiresAt;
+                var userId = int.TryParse(jwt.Subject, out var uid) ? uid : (int?)null;
+                if (userId.HasValue)
+                {
+                    db.AccessTokenBlacklists.Add(new AccessTokenBlacklist
+                    {
+                        Jti = jwt.Id,
+                        UserId = userId.Value,
+                        ExpiresAt = expiresAt,
+                        RevokedAt = DateTimeOffset.UtcNow
+                    });
+                }
             }
         }
     }
-    // Revoca del refresh token se presente nel body
     if (!string.IsNullOrWhiteSpace(req.RefreshToken))
     {
-        if (refreshTokens.TryGetValue(req.RefreshToken, out var entry))
+        var tokenHash = HashToken(req.RefreshToken);
+        var entry = await db.RefreshTokens.FirstOrDefaultAsync(r => r.TokenHash == tokenHash);
+        if (entry != null)
         {
             entry.IsRevoked = true;
-            refreshTokens[req.RefreshToken] = entry;
+            entry.RevokedAt = DateTimeOffset.UtcNow;
         }
     }
+    await db.SaveChangesAsync();
     return Results.Ok();
 }).RequireAuthorization();
 
@@ -339,9 +341,9 @@ app.MapPost("/api/auth/logout", (HttpContext context, LogoutRequest req, JwtToke
 // GET: /api/conti
 // Restituisce la lista di tutti i conti.
 // ----------------------------------------------------------------------------------------------
-app.MapGet("/api/conti", () => 
+app.MapGet("/api/conti", async (AppDbContext db) =>
 {
-    // Restituisce direttamente la lista. .NET la converte automaticamente in JSON.
+    var conti = await db.BankAccounts.AsNoTracking().ToListAsync();
     return Results.Ok(conti);
 }).RequireAuthorization();
 
@@ -349,18 +351,13 @@ app.MapGet("/api/conti", () =>
 // GET: /api/conti/{id}
 // Restituisce un singolo conto cercando per ID.
 // ----------------------------------------------------------------------------------------------
-app.MapGet("/api/conti/{id}", (int id) =>
+app.MapGet("/api/conti/{id}", async (int id, AppDbContext db) =>
 {
-    // Cerchiamo nella lista il primo conto che ha l'Id uguale a quello richiesto.
-    var conto = conti.FirstOrDefault(c => c.Id == id);
-
-    // Se non lo troviamo (è null), restituiamo 404 NotFound.
+    var conto = await db.BankAccounts.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
     if (conto is null)
     {
         return Results.NotFound(new { Message = "Conto non trovato" });
     }
-
-    // Se lo troviamo, restituiamo 200 OK con l'oggetto.
     return Results.Ok(conto);
 }).RequireAuthorization();
 
@@ -368,41 +365,49 @@ app.MapGet("/api/conti/{id}", (int id) =>
 // POST: /api/conti
 // Crea un nuovo conto.
 // ----------------------------------------------------------------------------------------------
-app.MapPost("/api/conti", (ContoBancario nuovoConto) =>
+app.MapPost("/api/conti", async (BankAccount nuovoConto, AppDbContext db) =>
 {
-    // Calcoliamo il nuovo ID: prendiamo il massimo ID attuale e aggiungiamo 1.
-    // Se la lista è vuota, partiamo da 1.
-    int newId = conti.Count > 0 ? conti.Max(c => c.Id) + 1 : 1;
-    nuovoConto.Id = newId;
-
-    // Aggiungiamo il nuovo conto alla lista.
-    conti.Add(nuovoConto);
-
-    // Restituiamo 200 OK con il conto appena creato (che ora ha l'ID).
-    return Results.Ok(nuovoConto);
+    var exists = await db.BankAccounts.AnyAsync(c => c.Iban == nuovoConto.Iban);
+    if (exists)
+    {
+        return Results.Conflict(new { Message = "IBAN già presente" });
+    }
+    var entity = new BankAccount
+    {
+        Name = nuovoConto.Name,
+        Iban = nuovoConto.Iban,
+        Currency = nuovoConto.Currency
+    };
+    db.BankAccounts.Add(entity);
+    await db.SaveChangesAsync();
+    await LogOperation(db, null, "create", "BankAccount", entity.Id, null);
+    return Results.Ok(entity);
 }).RequireAuthorization("AdminOnly");
 
 // ----------------------------------------------------------------------------------------------
 // PUT: /api/conti/{id}
 // Aggiorna un conto esistente.
 // ----------------------------------------------------------------------------------------------
-app.MapPut("/api/conti/{id}", (int id, ContoBancario contoAggiornato) =>
+app.MapPut("/api/conti/{id}", async (int id, BankAccount contoAggiornato, AppDbContext db) =>
 {
-    // Cerchiamo il conto da modificare.
-    var contoEsistente = conti.FirstOrDefault(c => c.Id == id);
-
-    // Se non esiste, errore 404.
+    var contoEsistente = await db.BankAccounts.FirstOrDefaultAsync(c => c.Id == id);
     if (contoEsistente is null)
     {
         return Results.NotFound();
     }
-
-    // Aggiorniamo i campi.
+    if (!string.Equals(contoEsistente.Iban, contoAggiornato.Iban, StringComparison.OrdinalIgnoreCase))
+    {
+        var ibanExists = await db.BankAccounts.AnyAsync(c => c.Iban == contoAggiornato.Iban && c.Id != id);
+        if (ibanExists)
+        {
+            return Results.Conflict(new { Message = "IBAN già presente" });
+        }
+    }
     contoEsistente.Name = contoAggiornato.Name;
     contoEsistente.Iban = contoAggiornato.Iban;
     contoEsistente.Currency = contoAggiornato.Currency;
-
-    // Restituiamo il conto aggiornato.
+    await db.SaveChangesAsync();
+    await LogOperation(db, null, "update", "BankAccount", contoEsistente.Id, null);
     return Results.Ok(contoEsistente);
 }).RequireAuthorization("AdminOnly");
 
@@ -410,19 +415,218 @@ app.MapPut("/api/conti/{id}", (int id, ContoBancario contoAggiornato) =>
 // DELETE: /api/conti/{id}
 // Elimina un conto.
 // ----------------------------------------------------------------------------------------------
-app.MapDelete("/api/conti/{id}", (int id) =>
+app.MapDelete("/api/conti/{id}", async (int id, AppDbContext db) =>
 {
-    // Cerchiamo il conto da eliminare.
-    var contoDaEliminare = conti.FirstOrDefault(c => c.Id == id);
-
-    // Se esiste, lo rimuoviamo dalla lista.
+    var contoDaEliminare = await db.BankAccounts.FirstOrDefaultAsync(c => c.Id == id);
     if (contoDaEliminare is not null)
     {
-        conti.Remove(contoDaEliminare);
+        db.BankAccounts.Remove(contoDaEliminare);
+        await db.SaveChangesAsync();
+        await LogOperation(db, null, "delete", "BankAccount", id, null);
     }
-
-    // Restituiamo 200 OK (anche se non c'era, per idempotenza spesso si fa così, oppure 204 No Content).
     return Results.Ok();
+}).RequireAuthorization("AdminOnly");
+
+app.MapGet("/api/conti-contabili", async (AppDbContext db) =>
+{
+    var conti = await db.ContiContabili.AsNoTracking().OrderBy(c => c.Nome).ToListAsync();
+    return Results.Ok(conti);
+}).RequireAuthorization();
+
+app.MapGet("/api/conti-contabili/{id}", async (int id, AppDbContext db) =>
+{
+    var conto = await db.ContiContabili.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
+    if (conto is null)
+    {
+        return Results.NotFound();
+    }
+    return Results.Ok(conto);
+}).RequireAuthorization();
+
+app.MapPost("/api/conti-contabili", async (ContoContabile conto, AppDbContext db) =>
+{
+    var exists = await db.ContiContabili.AnyAsync(c => c.Code == conto.Code);
+    if (exists)
+    {
+        return Results.Conflict(new { Message = "Codice già presente" });
+    }
+    var entity = new ContoContabile
+    {
+        Nome = conto.Nome,
+        Code = conto.Code,
+        Description = conto.Description,
+        Type = conto.Type
+    };
+    db.ContiContabili.Add(entity);
+    await db.SaveChangesAsync();
+    await LogOperation(db, null, "create", "ContoContabile", entity.Id, null);
+    return Results.Ok(entity);
+}).RequireAuthorization("AdminOnly");
+
+app.MapPut("/api/conti-contabili/{id}", async (int id, ContoContabile conto, AppDbContext db) =>
+{
+    var entity = await db.ContiContabili.FirstOrDefaultAsync(c => c.Id == id);
+    if (entity is null)
+    {
+        return Results.NotFound();
+    }
+    if (!string.Equals(entity.Code, conto.Code, StringComparison.OrdinalIgnoreCase))
+    {
+        var codeExists = await db.ContiContabili.AnyAsync(c => c.Code == conto.Code && c.Id != id);
+        if (codeExists)
+        {
+            return Results.Conflict(new { Message = "Codice già presente" });
+        }
+    }
+    entity.Nome = conto.Nome;
+    entity.Code = conto.Code;
+    entity.Description = conto.Description;
+    entity.Type = conto.Type;
+    await db.SaveChangesAsync();
+    await LogOperation(db, null, "update", "ContoContabile", entity.Id, null);
+    return Results.Ok(entity);
+}).RequireAuthorization("AdminOnly");
+
+app.MapDelete("/api/conti-contabili/{id}", async (int id, AppDbContext db) =>
+{
+    var entity = await db.ContiContabili.FirstOrDefaultAsync(c => c.Id == id);
+    if (entity is not null)
+    {
+        db.ContiContabili.Remove(entity);
+        await db.SaveChangesAsync();
+        await LogOperation(db, null, "delete", "ContoContabile", id, null);
+    }
+    return Results.Ok();
+}).RequireAuthorization("AdminOnly");
+
+app.MapGet("/api/movimenti", async (int? accountId, AppDbContext db) =>
+{
+    var query = db.BankMovements.AsNoTracking();
+    if (accountId.HasValue)
+    {
+        query = query.Where(m => m.AccountId == accountId.Value);
+    }
+    var list = await query.OrderByDescending(m => m.Date).ThenByDescending(m => m.Id).ToListAsync();
+    var dto = list.Select(ToDto).ToList();
+    return Results.Ok(dto);
+}).RequireAuthorization();
+
+app.MapGet("/api/movimenti/{id}", async (int id, AppDbContext db) =>
+{
+    var mov = await db.BankMovements.AsNoTracking().FirstOrDefaultAsync(m => m.Id == id);
+    if (mov is null)
+    {
+        return Results.NotFound();
+    }
+    return Results.Ok(ToDto(mov));
+}).RequireAuthorization();
+
+app.MapGet("/api/movimenti/balance/{accountId}", async (int accountId, AppDbContext db) =>
+{
+    var balance = await db.BankMovements
+        .Where(m => m.AccountId == accountId)
+        .SumAsync(m => (decimal?)m.Amount) ?? 0m;
+    return Results.Ok(balance);
+}).RequireAuthorization();
+
+app.MapPost("/api/movimenti", async (MovementRequest req, AppDbContext db) =>
+{
+    var accountExists = await db.BankAccounts.AnyAsync(a => a.Id == req.AccountId);
+    if (!accountExists)
+    {
+        return Results.BadRequest(new { Message = "Conto non valido" });
+    }
+    var direction = string.IsNullOrWhiteSpace(req.Direction)
+        ? (req.Amount >= 0 ? "credit" : "debit")
+        : req.Direction;
+    var mov = new BankMovement
+    {
+        AccountId = req.AccountId,
+        Date = ParseDate(req.Date),
+        Description = req.Description,
+        Currency = req.Currency,
+        Amount = req.Amount,
+        Direction = direction,
+        Category = req.Category,
+        CreatedAt = DateTime.UtcNow
+    };
+    db.BankMovements.Add(mov);
+    await db.SaveChangesAsync();
+    await RecalculateBalances(db, req.AccountId);
+    await LogOperation(db, null, "create", "BankMovement", mov.Id, null);
+    return Results.Ok(ToDto(mov));
+}).RequireAuthorization("AdminOnly");
+
+app.MapPut("/api/movimenti/{id}", async (int id, MovementRequest req, AppDbContext db) =>
+{
+    var mov = await db.BankMovements.FirstOrDefaultAsync(m => m.Id == id);
+    if (mov is null)
+    {
+        return Results.NotFound();
+    }
+    var direction = string.IsNullOrWhiteSpace(req.Direction)
+        ? (req.Amount >= 0 ? "credit" : "debit")
+        : req.Direction;
+    mov.AccountId = req.AccountId;
+    mov.Date = ParseDate(req.Date);
+    mov.Description = req.Description;
+    mov.Currency = req.Currency;
+    mov.Amount = req.Amount;
+    mov.Direction = direction;
+    mov.Category = req.Category;
+    await db.SaveChangesAsync();
+    await RecalculateBalances(db, mov.AccountId);
+    await LogOperation(db, null, "update", "BankMovement", mov.Id, null);
+    return Results.Ok(ToDto(mov));
+}).RequireAuthorization("AdminOnly");
+
+app.MapDelete("/api/movimenti/{id}", async (int id, AppDbContext db) =>
+{
+    var mov = await db.BankMovements.FirstOrDefaultAsync(m => m.Id == id);
+    if (mov is not null)
+    {
+        var accountId = mov.AccountId;
+        db.BankMovements.Remove(mov);
+        await db.SaveChangesAsync();
+        await RecalculateBalances(db, accountId);
+        await LogOperation(db, null, "delete", "BankMovement", id, null);
+    }
+    return Results.Ok();
+}).RequireAuthorization("AdminOnly");
+
+app.MapPost("/api/movimenti/installments", async (InstallmentRequest req, AppDbContext db) =>
+{
+    var accountExists = await db.BankAccounts.AnyAsync(a => a.Id == req.AccountId);
+    if (!accountExists)
+    {
+        return Results.BadRequest(new { Message = "Conto non valido" });
+    }
+    if (req.Count < 1)
+    {
+        return Results.BadRequest(new { Message = "Numero rate non valido" });
+    }
+    var list = new List<BankMovement>();
+    for (var i = 0; i < req.Count; i++)
+    {
+        var date = AddMonths(ParseDate(req.StartDate), i);
+        list.Add(new BankMovement
+        {
+            AccountId = req.AccountId,
+            Date = date,
+            Description = $"{req.Description} (Rata {i + 1}/{req.Count})",
+            Currency = req.Currency,
+            Amount = req.AmountPerInstallment,
+            Direction = req.AmountPerInstallment >= 0 ? "credit" : "debit",
+            Category = "Rateizzato",
+            CreatedAt = DateTime.UtcNow
+        });
+    }
+    db.BankMovements.AddRange(list);
+    await db.SaveChangesAsync();
+    await RecalculateBalances(db, req.AccountId);
+    await LogOperation(db, null, "create", "Installments", null, $"AccountId={req.AccountId}");
+    var dto = list.Select(ToDto).ToList();
+    return Results.Ok(dto);
 }).RequireAuthorization("AdminOnly");
 
 // ==============================================================================================
@@ -431,69 +635,215 @@ app.MapDelete("/api/conti/{id}", (int id) =>
 // Questo comando fa partire il server in ascolto sulle porte configurate.
 app.Run();
 
-// ==============================================================================================
-// CLASSI MODELLO (DATA MODELS)
-// ==============================================================================================
-// Definiamo la struttura dei dati. In un progetto grande starebbero in file separati.
+static BankMovementDto ToDto(BankMovement m) =>
+    new(
+        m.Id,
+        m.AccountId,
+        m.Date.ToString("yyyy-MM-dd"),
+        m.Description,
+        m.Currency,
+        m.Amount,
+        m.Direction,
+        m.Category,
+        m.BalanceAfter,
+        m.CreatedAt.ToString("o")
+    );
 
-public class ContoBancario
+static DateTime ParseDate(string value)
 {
-    public int Id { get; set; }
-    public string Name { get; set; } = string.Empty; // Inizializziamo a stringa vuota per evitare null
-    public string Iban { get; set; } = string.Empty;
-    public string Currency { get; set; } = "EUR";
+    var parsed = DateTime.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
+    return DateTime.SpecifyKind(parsed.Date, DateTimeKind.Utc);
 }
 
-// ==============================================================================================
-// MODELLI AUTENTICAZIONE
-// ==============================================================================================
-public class AuthUser
+static DateTime AddMonths(DateTime date, int months) => date.AddMonths(months);
+
+static async Task RecalculateBalances(AppDbContext db, int accountId)
 {
-    // ID univoco dell'utente
-    public int Id { get; set; }
-    // Username di login
-    public string Username { get; set; } = string.Empty;
-    // Password hashata con PBKDF2 (mai in chiaro)
-    public string PasswordHash { get; set; } = string.Empty;
-    // Ruolo dell'utente (usato per le policy)
-    public string Role { get; set; } = "User";
+    var list = await db.BankMovements
+        .Where(m => m.AccountId == accountId)
+        .OrderBy(m => m.Date)
+        .ThenBy(m => m.CreatedAt)
+        .ThenBy(m => m.Id)
+        .ToListAsync();
+
+    decimal balance = 0m;
+    foreach (var m in list)
+    {
+        balance += m.Amount;
+        m.BalanceAfter = balance;
+    }
+
+    await db.SaveChangesAsync();
 }
 
-public class LoginRequest
+static string HashToken(string token)
 {
-    // Username inserito nel form
-    public string Username { get; set; } = string.Empty;
-    // Password in chiaro (solo per il transito)
-    public string Password { get; set; } = string.Empty;
+    using var sha = SHA256.Create();
+    var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(token));
+    return Convert.ToBase64String(bytes);
 }
 
-public class RefreshRequest
+static async Task LogOperation(AppDbContext db, int? userId, string action, string entityName, int? entityId, string? details)
 {
-    // Refresh token inviato dal client
-    public string RefreshToken { get; set; } = string.Empty;
+    db.OperationLogs.Add(new OperationLog
+    {
+        UserId = userId,
+        Action = action,
+        EntityName = entityName,
+        EntityId = entityId,
+        Details = details,
+        CreatedAt = DateTimeOffset.UtcNow
+    });
+    await db.SaveChangesAsync();
 }
 
-public class LogoutRequest
+static void SeedData(AppDbContext db)
 {
-    // Refresh token da invalidare lato backend
-    public string? RefreshToken { get; set; }
+    if (!db.Roles.Any())
+    {
+        db.Roles.AddRange(
+            new Role { Name = "Admin" },
+            new Role { Name = "User" }
+        );
+        db.SaveChanges();
+    }
+
+    if (!db.Permissions.Any())
+    {
+        db.Permissions.AddRange(
+            new Permission { Name = "conti.read" },
+            new Permission { Name = "conti.write" },
+            new Permission { Name = "movimenti.read" },
+            new Permission { Name = "movimenti.write" },
+            new Permission { Name = "conti-contabili.read" },
+            new Permission { Name = "conti-contabili.write" },
+            new Permission { Name = "auth.manage" }
+        );
+        db.SaveChanges();
+    }
+
+    if (!db.RolePermissions.Any())
+    {
+        var adminRoleId = db.Roles.Single(r => r.Name == "Admin").Id;
+        var userRoleId = db.Roles.Single(r => r.Name == "User").Id;
+        var perms = db.Permissions.ToList();
+        db.RolePermissions.AddRange(
+            perms.Select(p => new RolePermission { RoleId = adminRoleId, PermissionId = p.Id })
+        );
+        db.RolePermissions.AddRange(
+            perms.Where(p => p.Name.EndsWith(".read", StringComparison.OrdinalIgnoreCase))
+                 .Select(p => new RolePermission { RoleId = userRoleId, PermissionId = p.Id })
+        );
+        db.SaveChanges();
+    }
+
+    if (!db.Users.Any())
+    {
+        var admin = new AuthUser
+        {
+            Username = "admin",
+            PasswordHash = PasswordHasher.Hash("Admin123!"),
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+        var user = new AuthUser
+        {
+            Username = "user",
+            PasswordHash = PasswordHasher.Hash("User123!"),
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+        db.Users.AddRange(admin, user);
+        db.SaveChanges();
+    }
+
+    if (!db.UserRoles.Any())
+    {
+        var adminRoleId = db.Roles.Single(r => r.Name == "Admin").Id;
+        var userRoleId = db.Roles.Single(r => r.Name == "User").Id;
+        var adminUserId = db.Users.Single(u => u.Username == "admin").Id;
+        var userUserId = db.Users.Single(u => u.Username == "user").Id;
+        db.UserRoles.AddRange(
+            new UserRole { UserId = adminUserId, RoleId = adminRoleId },
+            new UserRole { UserId = userUserId, RoleId = userRoleId }
+        );
+        db.SaveChanges();
+    }
+
+    if (!db.BankAccounts.Any())
+    {
+        db.BankAccounts.AddRange(
+            new BankAccount { Name = "Conto Principale", Iban = "IT60X0542811101000000123456", Currency = "EUR" },
+            new BankAccount { Name = "Conto Risparmio", Iban = "IT12A0123456789012345678901", Currency = "USD" }
+        );
+        db.SaveChanges();
+    }
+
+    if (!db.ContiContabili.Any())
+    {
+        db.ContiContabili.AddRange(
+            new ContoContabile { Nome = "Conto Corrente", Code = "CC001", Description = "Conto corrente principale", Type = "CORRENTI" },
+            new ContoContabile { Nome = "Conto Deposito", Code = "DP001", Description = "Conto deposito mensile", Type = "DEPOSITI" },
+            new ContoContabile { Nome = "Conto Prestito", Code = "PR001", Description = "Conto prestito mensile", Type = "PRESTITI" }
+        );
+        db.SaveChanges();
+    }
+
+    if (!db.BankMovements.Any())
+    {
+        var accountId = db.BankAccounts.OrderBy(a => a.Id).Select(a => a.Id).First();
+        var now = DateTime.UtcNow;
+        var m1 = new BankMovement
+        {
+            AccountId = accountId,
+            Date = DateTime.UtcNow.Date.AddDays(-2),
+            Description = "Stipendio Dicembre",
+            Currency = "EUR",
+            Amount = 2500m,
+            Direction = "credit",
+            Category = "Stipendio",
+            CreatedAt = now
+        };
+        var m2 = new BankMovement
+        {
+            AccountId = accountId,
+            Date = DateTime.UtcNow.Date.AddDays(-1),
+            Description = "Pagamento bolletta luce",
+            Currency = "EUR",
+            Amount = -120.50m,
+            Direction = "debit",
+            Category = "Bolletta",
+            CreatedAt = now
+        };
+        db.BankMovements.AddRange(m1, m2);
+        db.SaveChanges();
+        var list = db.BankMovements.Where(m => m.AccountId == accountId).OrderBy(m => m.Date).ThenBy(m => m.Id).ToList();
+        decimal balance = 0m;
+        foreach (var m in list)
+        {
+            balance += m.Amount;
+            m.BalanceAfter = balance;
+        }
+        db.SaveChanges();
+    }
+
+    if (!db.AppSettings.Any())
+    {
+        db.AppSettings.AddRange(
+            new AppSetting { Key = "DefaultCurrency", Value = "EUR", UpdatedAt = DateTimeOffset.UtcNow },
+            new AppSetting { Key = "InstallmentMax", Value = "120", UpdatedAt = DateTimeOffset.UtcNow }
+        );
+        db.SaveChanges();
+    }
 }
 
-public class RefreshTokenEntry
-{
-    // Utente a cui appartiene il refresh token
-    public int UserId { get; set; }
-    // Valore del refresh token
-    public string Token { get; set; } = string.Empty;
-    // Scadenza temporale del refresh token
-    public DateTimeOffset ExpiresAt { get; set; }
-    // Flag di revoca (true quando il token è stato invalidato)
-    public bool IsRevoked { get; set; }
-}
+public record LoginRequest(string Username, string Password);
+public record RefreshRequest(string RefreshToken);
+public record LogoutRequest(string? RefreshToken);
+public record MovementRequest(int AccountId, string Date, string Description, string Currency, decimal Amount, string? Direction, string? Category);
+public record InstallmentRequest(int AccountId, string StartDate, string Description, string Currency, decimal AmountPerInstallment, int Count);
+public record BankMovementDto(int Id, int AccountId, string Date, string Description, string Currency, decimal Amount, string? Direction, string? Category, decimal? BalanceAfter, string? CreatedAt);
 
-// ==============================================================================================
-// UTILITÀ: HASH DELLA PASSWORD
-// ==============================================================================================
 public static class PasswordHasher
 {
     // Hash della password con PBKDF2

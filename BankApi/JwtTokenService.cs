@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using BankApi.Data;
 using Microsoft.IdentityModel.Tokens;
 
 // ==============================================================================================
@@ -27,30 +28,25 @@ public sealed class JwtTokenService
         _key = Encoding.UTF8.GetBytes(options.Secret);
     }
 
-    // Crea una coppia di token (Access + Refresh) per un utente autenticato
-    // Parametri:
-    // - user: utente autenticato con ID e ruolo
-    // Ritorno:
-    // - TokenResult contenente access token, refresh token e scadenze
-    // Eccezioni:
-    // - Nessuna eccezione specifica gestita qui; eventuali errori di runtime sono propagati.
-    public TokenResult CreateTokens(AuthUser user)
+    public TokenResult CreateTokens(AuthUser user, IReadOnlyCollection<string> roles)
     {
         var now = DateTimeOffset.UtcNow;
-        // JTI: identificatore univoco del token per gestire revoche e blacklist
         var jti = Guid.NewGuid().ToString("N");
-        // Claim minimi richiesti: sub (ID utente), role, iat (timestamp), jti
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new(ClaimTypes.Role, user.Role),
             new(JwtRegisteredClaimNames.Iat, now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
             new(JwtRegisteredClaimNames.Jti, jti)
         };
+        foreach (var role in roles)
+        {
+            if (!string.IsNullOrWhiteSpace(role))
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            }
+        }
 
-        // Calcolo scadenza access token
         var expiresAt = now.Add(_options.AccessTokenLifetime);
-        // Creazione JWT firmato con HMAC-SHA256 e chiave simmetrica
         var token = new JwtSecurityToken(
             _options.Issuer,
             _options.Audience,
@@ -60,11 +56,8 @@ public sealed class JwtTokenService
             signingCredentials: new SigningCredentials(new SymmetricSecurityKey(_key), SecurityAlgorithms.HmacSha256)
         );
 
-        // Serializzazione in stringa compatta "eyJ..."
         var accessToken = _handler.WriteToken(token);
-        // Refresh token casuale per mantenere la sessione senza nuovo login
         var refreshToken = CreateRefreshToken();
-        // Scadenza del refresh token
         var refreshExpiresAt = now.Add(_options.RefreshTokenLifetime);
         return new TokenResult(accessToken, expiresAt, refreshToken, refreshExpiresAt, jti);
     }
