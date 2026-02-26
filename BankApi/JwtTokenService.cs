@@ -28,6 +28,12 @@ public sealed class JwtTokenService
         _key = Encoding.UTF8.GetBytes(options.Secret);
     }
 
+    // Genera access token e refresh token per l'utente autenticato
+    // Parametri:
+    // - user: utente di riferimento
+    // - roles: ruoli associati da includere nei claim
+    // Ritorno:
+    // - TokenResult con access token, refresh token e scadenze
     public TokenResult CreateTokens(AuthUser user, IReadOnlyCollection<string> roles)
     {
         var now = DateTimeOffset.UtcNow;

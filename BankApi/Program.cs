@@ -83,6 +83,7 @@ builder.Services.AddSingleton(jwtOptions);
 // Registriamo il servizio che genera e legge i token
 builder.Services.AddSingleton<JwtTokenService>();
 
+// Configurazione EF Core: colleghiamo il DbContext al database SQL Server DB_Esempio
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DbEsempio")));
 
@@ -169,6 +170,7 @@ app.UseAuthorization();
 // ==============================================================================================
 // Qui mappiamo gli URL (es. /api/conti) alle funzioni che devono rispondere.
 
+// Inizializzazione database: creiamo lo schema e inseriamo dati base se mancanti
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -195,6 +197,7 @@ app.MapPost("/api/auth/login", async (LoginRequest req, JwtTokenService tokenSer
         return Results.Unauthorized();
     }
 
+    // Recuperiamo i ruoli assegnati all'utente per inserirli nei claim del JWT
     var roles = await db.UserRoles
         .Include(ur => ur.Role)
         .Where(ur => ur.UserId == user.Id)
@@ -205,10 +208,12 @@ app.MapPost("/api/auth/login", async (LoginRequest req, JwtTokenService tokenSer
         roles.Add("User");
     }
 
+    // Generiamo access token e refresh token
     var tokens = tokenService.CreateTokens(user, roles);
     var entry = new RefreshToken
     {
         UserId = user.Id,
+        // Memorizziamo solo l'hash del refresh token per maggiore sicurezza
         TokenHash = HashToken(tokens.RefreshToken),
         ExpiresAt = tokens.RefreshTokenExpiresAt,
         IsRevoked = false,
@@ -240,6 +245,7 @@ app.MapPost("/api/auth/refresh", async (RefreshRequest req, JwtTokenService toke
         return Results.Unauthorized();
     }
 
+    // Cerchiamo il refresh token in DB tramite hash, evitando di salvare il token in chiaro
     var tokenHash = HashToken(req.RefreshToken);
     var entry = await db.RefreshTokens
         .Include(r => r.User)
@@ -255,6 +261,7 @@ app.MapPost("/api/auth/refresh", async (RefreshRequest req, JwtTokenService toke
         return Results.Unauthorized();
     }
 
+    // Carichiamo i ruoli dell'utente per costruire i claim
     var roles = await db.UserRoles
         .Include(ur => ur.Role)
         .Where(ur => ur.UserId == user.Id)
@@ -265,6 +272,7 @@ app.MapPost("/api/auth/refresh", async (RefreshRequest req, JwtTokenService toke
         roles.Add("User");
     }
 
+    // Generiamo una nuova coppia di token e invalidiamo il refresh token precedente
     var tokens = tokenService.CreateTokens(user, roles);
     var newRefresh = new RefreshToken
     {
@@ -297,6 +305,7 @@ app.MapPost("/api/auth/refresh", async (RefreshRequest req, JwtTokenService toke
 // - 200 OK sempre (operazione idempotente)
 app.MapPost("/api/auth/logout", async (HttpContext context, LogoutRequest req, JwtTokenService tokenService, AppDbContext db) =>
 {
+    // Revoca dell'access token tramite inserimento in blacklist con data di scadenza
     var authHeader = context.Request.Headers.Authorization.ToString();
     if (authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
     {
@@ -323,6 +332,7 @@ app.MapPost("/api/auth/logout", async (HttpContext context, LogoutRequest req, J
             }
         }
     }
+    // Revoca del refresh token associato, se presente nel body
     if (!string.IsNullOrWhiteSpace(req.RefreshToken))
     {
         var tokenHash = HashToken(req.RefreshToken);
@@ -427,12 +437,20 @@ app.MapDelete("/api/conti/{id}", async (int id, AppDbContext db) =>
     return Results.Ok();
 }).RequireAuthorization("AdminOnly");
 
+// ----------------------------------------------------------------------------------------------
+// GET: /api/conti-contabili
+// Restituisce l'elenco dei conti contabili ordinati per nome.
+// ----------------------------------------------------------------------------------------------
 app.MapGet("/api/conti-contabili", async (AppDbContext db) =>
 {
     var conti = await db.ContiContabili.AsNoTracking().OrderBy(c => c.Nome).ToListAsync();
     return Results.Ok(conti);
 }).RequireAuthorization();
 
+// ----------------------------------------------------------------------------------------------
+// GET: /api/conti-contabili/{id}
+// Restituisce un conto contabile per ID.
+// ----------------------------------------------------------------------------------------------
 app.MapGet("/api/conti-contabili/{id}", async (int id, AppDbContext db) =>
 {
     var conto = await db.ContiContabili.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
@@ -443,6 +461,10 @@ app.MapGet("/api/conti-contabili/{id}", async (int id, AppDbContext db) =>
     return Results.Ok(conto);
 }).RequireAuthorization();
 
+// ----------------------------------------------------------------------------------------------
+// POST: /api/conti-contabili
+// Crea un nuovo conto contabile con codice univoco.
+// ----------------------------------------------------------------------------------------------
 app.MapPost("/api/conti-contabili", async (ContoContabile conto, AppDbContext db) =>
 {
     var exists = await db.ContiContabili.AnyAsync(c => c.Code == conto.Code);
@@ -463,6 +485,10 @@ app.MapPost("/api/conti-contabili", async (ContoContabile conto, AppDbContext db
     return Results.Ok(entity);
 }).RequireAuthorization("AdminOnly");
 
+// ----------------------------------------------------------------------------------------------
+// PUT: /api/conti-contabili/{id}
+// Aggiorna un conto contabile esistente.
+// ----------------------------------------------------------------------------------------------
 app.MapPut("/api/conti-contabili/{id}", async (int id, ContoContabile conto, AppDbContext db) =>
 {
     var entity = await db.ContiContabili.FirstOrDefaultAsync(c => c.Id == id);
@@ -487,6 +513,10 @@ app.MapPut("/api/conti-contabili/{id}", async (int id, ContoContabile conto, App
     return Results.Ok(entity);
 }).RequireAuthorization("AdminOnly");
 
+// ----------------------------------------------------------------------------------------------
+// DELETE: /api/conti-contabili/{id}
+// Elimina un conto contabile.
+// ----------------------------------------------------------------------------------------------
 app.MapDelete("/api/conti-contabili/{id}", async (int id, AppDbContext db) =>
 {
     var entity = await db.ContiContabili.FirstOrDefaultAsync(c => c.Id == id);
@@ -499,6 +529,10 @@ app.MapDelete("/api/conti-contabili/{id}", async (int id, AppDbContext db) =>
     return Results.Ok();
 }).RequireAuthorization("AdminOnly");
 
+// ----------------------------------------------------------------------------------------------
+// GET: /api/movimenti
+// Restituisce i movimenti, filtrabili per accountId.
+// ----------------------------------------------------------------------------------------------
 app.MapGet("/api/movimenti", async (int? accountId, AppDbContext db) =>
 {
     var query = db.BankMovements.AsNoTracking();
@@ -511,6 +545,10 @@ app.MapGet("/api/movimenti", async (int? accountId, AppDbContext db) =>
     return Results.Ok(dto);
 }).RequireAuthorization();
 
+// ----------------------------------------------------------------------------------------------
+// GET: /api/movimenti/{id}
+// Restituisce un singolo movimento per ID.
+// ----------------------------------------------------------------------------------------------
 app.MapGet("/api/movimenti/{id}", async (int id, AppDbContext db) =>
 {
     var mov = await db.BankMovements.AsNoTracking().FirstOrDefaultAsync(m => m.Id == id);
@@ -521,6 +559,10 @@ app.MapGet("/api/movimenti/{id}", async (int id, AppDbContext db) =>
     return Results.Ok(ToDto(mov));
 }).RequireAuthorization();
 
+// ----------------------------------------------------------------------------------------------
+// GET: /api/movimenti/balance/{accountId}
+// Calcola il saldo aggregato di un conto.
+// ----------------------------------------------------------------------------------------------
 app.MapGet("/api/movimenti/balance/{accountId}", async (int accountId, AppDbContext db) =>
 {
     var balance = await db.BankMovements
@@ -529,6 +571,10 @@ app.MapGet("/api/movimenti/balance/{accountId}", async (int accountId, AppDbCont
     return Results.Ok(balance);
 }).RequireAuthorization();
 
+// ----------------------------------------------------------------------------------------------
+// POST: /api/movimenti
+// Inserisce un nuovo movimento e ricalcola i saldi.
+// ----------------------------------------------------------------------------------------------
 app.MapPost("/api/movimenti", async (MovementRequest req, AppDbContext db) =>
 {
     var accountExists = await db.BankAccounts.AnyAsync(a => a.Id == req.AccountId);
@@ -536,6 +582,7 @@ app.MapPost("/api/movimenti", async (MovementRequest req, AppDbContext db) =>
     {
         return Results.BadRequest(new { Message = "Conto non valido" });
     }
+    // Se non viene indicata la direzione, la deduciamo dal segno dell'importo
     var direction = string.IsNullOrWhiteSpace(req.Direction)
         ? (req.Amount >= 0 ? "credit" : "debit")
         : req.Direction;
@@ -552,11 +599,16 @@ app.MapPost("/api/movimenti", async (MovementRequest req, AppDbContext db) =>
     };
     db.BankMovements.Add(mov);
     await db.SaveChangesAsync();
+    // Ricalcolo del saldo progressivo dopo l'inserimento
     await RecalculateBalances(db, req.AccountId);
     await LogOperation(db, null, "create", "BankMovement", mov.Id, null);
     return Results.Ok(ToDto(mov));
 }).RequireAuthorization("AdminOnly");
 
+// ----------------------------------------------------------------------------------------------
+// PUT: /api/movimenti/{id}
+// Aggiorna un movimento esistente.
+// ----------------------------------------------------------------------------------------------
 app.MapPut("/api/movimenti/{id}", async (int id, MovementRequest req, AppDbContext db) =>
 {
     var mov = await db.BankMovements.FirstOrDefaultAsync(m => m.Id == id);
@@ -564,6 +616,7 @@ app.MapPut("/api/movimenti/{id}", async (int id, MovementRequest req, AppDbConte
     {
         return Results.NotFound();
     }
+    // Se non viene indicata la direzione, la deduciamo dal segno dell'importo
     var direction = string.IsNullOrWhiteSpace(req.Direction)
         ? (req.Amount >= 0 ? "credit" : "debit")
         : req.Direction;
@@ -575,11 +628,16 @@ app.MapPut("/api/movimenti/{id}", async (int id, MovementRequest req, AppDbConte
     mov.Direction = direction;
     mov.Category = req.Category;
     await db.SaveChangesAsync();
+    // Ricalcolo del saldo progressivo dopo la modifica
     await RecalculateBalances(db, mov.AccountId);
     await LogOperation(db, null, "update", "BankMovement", mov.Id, null);
     return Results.Ok(ToDto(mov));
 }).RequireAuthorization("AdminOnly");
 
+// ----------------------------------------------------------------------------------------------
+// DELETE: /api/movimenti/{id}
+// Elimina un movimento e aggiorna il saldo.
+// ----------------------------------------------------------------------------------------------
 app.MapDelete("/api/movimenti/{id}", async (int id, AppDbContext db) =>
 {
     var mov = await db.BankMovements.FirstOrDefaultAsync(m => m.Id == id);
@@ -588,12 +646,17 @@ app.MapDelete("/api/movimenti/{id}", async (int id, AppDbContext db) =>
         var accountId = mov.AccountId;
         db.BankMovements.Remove(mov);
         await db.SaveChangesAsync();
+        // Ricalcolo del saldo progressivo dopo la cancellazione
         await RecalculateBalances(db, accountId);
         await LogOperation(db, null, "delete", "BankMovement", id, null);
     }
     return Results.Ok();
 }).RequireAuthorization("AdminOnly");
 
+// ----------------------------------------------------------------------------------------------
+// POST: /api/movimenti/installments
+// Crea un gruppo di movimenti rateizzati sullo stesso conto.
+// ----------------------------------------------------------------------------------------------
 app.MapPost("/api/movimenti/installments", async (InstallmentRequest req, AppDbContext db) =>
 {
     var accountExists = await db.BankAccounts.AnyAsync(a => a.Id == req.AccountId);
@@ -608,6 +671,7 @@ app.MapPost("/api/movimenti/installments", async (InstallmentRequest req, AppDbC
     var list = new List<BankMovement>();
     for (var i = 0; i < req.Count; i++)
     {
+        // Per ogni rata spostiamo la data di un mese rispetto alla data iniziale
         var date = AddMonths(ParseDate(req.StartDate), i);
         list.Add(new BankMovement
         {
@@ -635,6 +699,12 @@ app.MapPost("/api/movimenti/installments", async (InstallmentRequest req, AppDbC
 // Questo comando fa partire il server in ascolto sulle porte configurate.
 app.Run();
 
+// ==============================================================================================
+// 6. UTILITÀ E SUPPORTO
+// ==============================================================================================
+// Funzioni di supporto usate dagli endpoint per conversioni, hashing e calcoli.
+
+// Converte l'entità BankMovement nel DTO esposto all'esterno
 static BankMovementDto ToDto(BankMovement m) =>
     new(
         m.Id,
@@ -649,14 +719,17 @@ static BankMovementDto ToDto(BankMovement m) =>
         m.CreatedAt.ToString("o")
     );
 
+// Parsing della data in formato stringa (ISO) con normalizzazione a UTC
 static DateTime ParseDate(string value)
 {
     var parsed = DateTime.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
     return DateTime.SpecifyKind(parsed.Date, DateTimeKind.Utc);
 }
 
+// Helper per aggiungere mesi alla data di partenza delle rate
 static DateTime AddMonths(DateTime date, int months) => date.AddMonths(months);
 
+// Ricalcolo del saldo progressivo per un conto specifico
 static async Task RecalculateBalances(AppDbContext db, int accountId)
 {
     var list = await db.BankMovements
@@ -676,6 +749,7 @@ static async Task RecalculateBalances(AppDbContext db, int accountId)
     await db.SaveChangesAsync();
 }
 
+// Hash del refresh token prima di salvarlo su DB
 static string HashToken(string token)
 {
     using var sha = SHA256.Create();
@@ -683,6 +757,7 @@ static string HashToken(string token)
     return Convert.ToBase64String(bytes);
 }
 
+// Traccia le operazioni principali su DB in una tabella di log
 static async Task LogOperation(AppDbContext db, int? userId, string action, string entityName, int? entityId, string? details)
 {
     db.OperationLogs.Add(new OperationLog
@@ -697,6 +772,7 @@ static async Task LogOperation(AppDbContext db, int? userId, string action, stri
     await db.SaveChangesAsync();
 }
 
+// Seed dati iniziali per ruoli, permessi, utenti, conti e impostazioni
 static void SeedData(AppDbContext db)
 {
     if (!db.Roles.Any())
@@ -837,6 +913,9 @@ static void SeedData(AppDbContext db)
     }
 }
 
+// ==============================================================================================
+// DTO DI RICHIESTA/RESPOSTA
+// ==============================================================================================
 public record LoginRequest(string Username, string Password);
 public record RefreshRequest(string RefreshToken);
 public record LogoutRequest(string? RefreshToken);
