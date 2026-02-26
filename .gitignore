@@ -1,22 +1,35 @@
-## Root ignore
-
-# OS
+### OS
 .DS_Store
 Thumbs.db
 
-# VS Code
+### Editor/IDE
 .vscode/
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
 
-# .NET build artifacts
-BankApi/bin/
-BankApi/obj/
-BankApi.Tests/bin/
-BankApi.Tests/obj/
+### .NET
+**/bin/
+**/obj/
 TestResults/
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
 
-# Node/Angular (if run from repo root)
-bank-movement-manager/dist/
-bank-movement-manager/tmp/
-bank-movement-manager/out-tsc/
-bank-movement-manager/node_modules/
+### Node / Angular
+**/node_modules/
+**/dist/
+**/tmp/
+**/out-tsc/
+**/.angular/cache/
+coverage/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
+### Build output
+*.log
