@@ -813,38 +813,54 @@ static void SeedData(AppDbContext db)
         db.SaveChanges();
     }
 
-    if (!db.Users.Any())
+    var admin = db.Users.SingleOrDefault(u => u.Username == "admin");
+    if (admin is null)
     {
-        var admin = new AuthUser
+        admin = new AuthUser
         {
             Username = "admin",
             PasswordHash = PasswordHasher.Hash("Admin123!"),
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
-        var user = new AuthUser
+        db.Users.Add(admin);
+    }
+    else
+    {
+        admin.PasswordHash = PasswordHasher.Hash("Admin123!");
+        admin.IsActive = true;
+    }
+
+    var user = db.Users.SingleOrDefault(u => u.Username == "user");
+    if (user is null)
+    {
+        user = new AuthUser
         {
             Username = "user",
             PasswordHash = PasswordHasher.Hash("User123!"),
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
-        db.Users.AddRange(admin, user);
-        db.SaveChanges();
+        db.Users.Add(user);
     }
-
-    if (!db.UserRoles.Any())
+    else
     {
-        var adminRoleId = db.Roles.Single(r => r.Name == "Admin").Id;
-        var userRoleId = db.Roles.Single(r => r.Name == "User").Id;
-        var adminUserId = db.Users.Single(u => u.Username == "admin").Id;
-        var userUserId = db.Users.Single(u => u.Username == "user").Id;
-        db.UserRoles.AddRange(
-            new UserRole { UserId = adminUserId, RoleId = adminRoleId },
-            new UserRole { UserId = userUserId, RoleId = userRoleId }
-        );
-        db.SaveChanges();
+        user.PasswordHash = PasswordHasher.Hash("User123!");
+        user.IsActive = true;
     }
+    db.SaveChanges();
+
+    var adminRoleIdForUsers = db.Roles.Single(r => r.Name == "Admin").Id;
+    var userRoleIdForUsers = db.Roles.Single(r => r.Name == "User").Id;
+    if (!db.UserRoles.Any(ur => ur.UserId == admin.Id && ur.RoleId == adminRoleIdForUsers))
+    {
+        db.UserRoles.Add(new UserRole { UserId = admin.Id, RoleId = adminRoleIdForUsers });
+    }
+    if (!db.UserRoles.Any(ur => ur.UserId == user.Id && ur.RoleId == userRoleIdForUsers))
+    {
+        db.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = userRoleIdForUsers });
+    }
+    db.SaveChanges();
 
     if (!db.BankAccounts.Any())
     {
